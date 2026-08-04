@@ -1,0 +1,6 @@
+[alias]
+gha_clippy = "clippy --all-features -- -D warnings -W clippy::nursery"
+gha_fmt = "fmt --all"
+
+[net]
+git-fetch-with-cli = true
