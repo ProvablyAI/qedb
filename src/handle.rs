@@ -9,6 +9,7 @@ use ark_bls12_381::{Fr, G1Projective};
 use ark_ff::{Field, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::ops::{Add, Mul, Neg, Sub};
 
 /// Up to this many roots, [`product_of_roots`] multiplies the factors one at a time instead of
@@ -105,13 +106,13 @@ impl Slice {
 }
 
 /// Handle to a set: the accumulator `[P_S(τ)]₁`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct SetHandle(pub(crate) G1Projective);
 
 /// Handle to a slice: the commitment `[v(τ)]₁`.
 ///
 /// Slice handles are homomorphic, so the verifier computes `α·u + w` locally (Fig. 8).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct SliceHandle(pub(crate) G1Projective);
 
 impl Add for SliceHandle {

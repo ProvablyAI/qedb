@@ -4,6 +4,7 @@
 
 pub mod handle;
 pub mod setup;
+pub mod transcript;
 
 use std::fmt;
 
