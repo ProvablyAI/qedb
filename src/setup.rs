@@ -22,7 +22,8 @@ pub struct Srs {
 }
 
 impl Srs {
-    /// Samples `τ` and builds the SRS for at least `n` rows (`N` is `n` rounded up to a power of two).
+    /// Samples `τ` and builds the SRS for at least `n` rows (`N` is `n` rounded up to a power of
+    /// two).
     pub fn setup<R: Rng + ?Sized>(n: usize, rng: &mut R) -> Result<Self, Error> {
         let domain = Domain::new(n).ok_or(Error::Domain(n))?;
         let tau = Fr::rand(rng);

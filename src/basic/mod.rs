@@ -1,8 +1,10 @@
 //! Basic tests of the paper's model (Fig. 8).
 
 pub mod complement;
+mod coprime;
 pub mod intersection;
 pub mod subset;
+pub mod union;
 pub mod zero_test;
 
 use crate::Error;
