@@ -6,7 +6,7 @@ authors = ["Provably Technologies"]
 description = "Expressive and Modular Verifiable Databases (without SNARKs)"
 homepage = "https://provably.ai/"
 repository = "https://github.com/ProvablyAI/qedb"
-license = "Business Source License 1.1"
+license = "BUSL-1.1"
 rust-version = "1.97"
 
 [dependencies]
@@ -17,4 +17,4 @@ ark-poly = { version = "0.6", features = ["parallel"] }
 ark-serialize = { version = "0.6", features = ["derive", "parallel"] }
 ark-std = { version = "0.6", features = ["parallel"] }
 rayon = "1"
-sha2 = "0.11.1"
+sha2 = "0.11"
