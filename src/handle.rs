@@ -10,6 +10,7 @@ use ark_ff::{Field, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use rayon::prelude::*;
 use std::ops::{Add, Mul, Neg, Sub};
 
 /// Up to this many roots, [`product_of_roots`] multiplies the factors one at a time instead of
@@ -42,7 +43,7 @@ impl Set {
                 size: domain.size(),
             });
         }
-        let roots: Vec<Fr> = self.0.iter().map(|&i| domain.element(i)).collect();
+        let roots: Vec<Fr> = self.0.par_iter().map(|&i| domain.element(i)).collect();
         Ok(product_of_roots(&roots))
     }
 

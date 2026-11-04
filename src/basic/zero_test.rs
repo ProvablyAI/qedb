@@ -37,13 +37,12 @@ impl ZeroTestProof {
         transcript: &mut Transcript,
     ) -> Result<Self, Error> {
         let values = v.slice().values();
-        if let Some(&row) = s
-            .set()
-            .rows()
+        let rows = s.set().rows();
+        if rows
             .iter()
-            .find(|&&row| values.get(row).is_some_and(|value| !value.is_zero()))
+            .any(|&row| values.get(row).is_some_and(|value| !value.is_zero()))
         {
-            return Err(Error::NotZero { row });
+            return Err(Error::InvalidWitness("zero test"));
         }
 
         let q = divide_exact(v.polynomial(), s.polynomial())?;
@@ -155,7 +154,7 @@ mod tests {
 
         assert_eq!(
             prove(&srs, &slice(&srs, &[5, 0, 7]), &set(&srs, [1, 2])),
-            Err(Error::NotZero { row: 2 })
+            Err(Error::InvalidWitness("zero test"))
         );
     }
 }
