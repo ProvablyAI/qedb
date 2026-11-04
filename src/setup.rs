@@ -23,9 +23,9 @@ pub struct Srs {
 
 impl Srs {
     /// Samples `τ` and builds the SRS for at least `n` rows (`N` is `n` rounded up to a power of
-    /// two).
+    /// two, and at least 2).
     pub fn setup<R: Rng + ?Sized>(n: usize, rng: &mut R) -> Result<Self, Error> {
-        let domain = Domain::new(n).ok_or(Error::Domain(n))?;
+        let domain = Domain::new(n.max(2)).ok_or(Error::Domain(n))?;
         let tau = Fr::rand(rng);
         let powers: Vec<Fr> = iter::successors(Some(Fr::ONE), |p| Some(*p * tau))
             .take(domain.size() + 1)
@@ -51,6 +51,11 @@ impl Srs {
     /// `[p(τ)]₂` for `p` given by its coefficients.
     pub fn commit_g2(&self, coeffs: &[Fr]) -> Result<G2Projective, Error> {
         commit(&self.g2, coeffs)
+    }
+
+    /// `[τⁱ]₂` for `i = 0, …, N`.
+    pub(crate) fn g2_powers(&self) -> &[G2Affine] {
+        &self.g2
     }
 }
 

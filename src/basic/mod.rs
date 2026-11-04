@@ -2,6 +2,7 @@
 
 pub mod complement;
 mod coprime;
+pub mod inner_product;
 pub mod intersection;
 pub mod subset;
 pub mod union;
