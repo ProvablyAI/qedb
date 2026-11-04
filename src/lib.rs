@@ -2,6 +2,7 @@
 
 #![warn(missing_docs)]
 
+pub mod handle;
 pub mod setup;
 
 use std::fmt;
@@ -18,6 +19,13 @@ pub enum Error {
         /// Powers in the SRS.
         max: usize,
     },
+    /// A row is outside the evaluation domain.
+    RowOutOfDomain {
+        /// The row.
+        row: usize,
+        /// Rows in the domain.
+        size: usize,
+    },
 }
 
 impl fmt::Display for Error {
@@ -29,6 +37,9 @@ impl fmt::Display for Error {
                     f,
                     "polynomial has {len} coefficients, the SRS supports {max}"
                 )
+            }
+            Self::RowOutOfDomain { row, size } => {
+                write!(f, "row {row} is outside the domain of {size} rows")
             }
         }
     }
