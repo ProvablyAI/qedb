@@ -33,6 +33,8 @@ pub enum Error {
         /// The row.
         row: usize,
     },
+    /// The prover's witness does not satisfy the named test.
+    InvalidWitness(&'static str),
     /// The verifier rejected a proof of the named test.
     Rejected(&'static str),
 }
@@ -51,6 +53,7 @@ impl fmt::Display for Error {
                 write!(f, "row {row} is outside the domain of {size} rows")
             }
             Self::NotZero { row } => write!(f, "the slice is not zero on row {row}"),
+            Self::InvalidWitness(test) => write!(f, "{test}: invalid witness"),
             Self::Rejected(test) => write!(f, "{test}: verification failed"),
         }
     }

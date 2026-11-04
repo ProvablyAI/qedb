@@ -46,10 +46,40 @@ impl Set {
         Ok(product_of_roots(&roots))
     }
 
-    /// The accumulator `[P_S(τ)]₁`.
-    pub fn handle(&self, srs: &Srs) -> Result<SetHandle, Error> {
-        let p = self.characteristic(srs.domain())?;
-        Ok(SetHandle(srs.commit_g1(&p)?))
+    /// Commits to the set: its characteristic polynomial and the accumulator `[P_S(τ)]₁`.
+    pub fn commit(self, srs: &Srs) -> Result<CommittedSet, Error> {
+        let polynomial = self.characteristic(srs.domain())?;
+        let handle = SetHandle(srs.commit_g1(&polynomial)?);
+        Ok(CommittedSet {
+            set: self,
+            polynomial,
+            handle,
+        })
+    }
+}
+
+/// A set with its characteristic polynomial and handle, as held by the prover.
+#[derive(Clone, Debug)]
+pub struct CommittedSet {
+    set: Set,
+    polynomial: DensePolynomial<Fr>,
+    handle: SetHandle,
+}
+
+impl CommittedSet {
+    /// The set `S`.
+    pub const fn set(&self) -> &Set {
+        &self.set
+    }
+
+    /// The characteristic polynomial `P_S`.
+    pub const fn polynomial(&self) -> &DensePolynomial<Fr> {
+        &self.polynomial
+    }
+
+    /// The handle `S̃`.
+    pub const fn handle(&self) -> SetHandle {
+        self.handle
     }
 }
 
@@ -98,10 +128,40 @@ impl Slice {
         Ok(DensePolynomial::from_coefficients_vec(domain.ifft(&self.0)))
     }
 
-    /// The commitment `[v(τ)]₁`.
-    pub fn handle(&self, srs: &Srs) -> Result<SliceHandle, Error> {
-        let p = self.polynomial(srs.domain())?;
-        Ok(SliceHandle(srs.commit_g1(&p)?))
+    /// Commits to the slice: its polynomial and the commitment `[v(τ)]₁`.
+    pub fn commit(self, srs: &Srs) -> Result<CommittedSlice, Error> {
+        let polynomial = self.polynomial(srs.domain())?;
+        let handle = SliceHandle(srs.commit_g1(&polynomial)?);
+        Ok(CommittedSlice {
+            slice: self,
+            polynomial,
+            handle,
+        })
+    }
+}
+
+/// A slice with its polynomial and handle, as held by the prover.
+#[derive(Clone, Debug)]
+pub struct CommittedSlice {
+    slice: Slice,
+    polynomial: DensePolynomial<Fr>,
+    handle: SliceHandle,
+}
+
+impl CommittedSlice {
+    /// The slice `v`.
+    pub const fn slice(&self) -> &Slice {
+        &self.slice
+    }
+
+    /// The polynomial `v(x)`.
+    pub const fn polynomial(&self) -> &DensePolynomial<Fr> {
+        &self.polynomial
+    }
+
+    /// The handle `ṽ`.
+    pub const fn handle(&self) -> SliceHandle {
+        self.handle
     }
 }
 
@@ -180,11 +240,11 @@ mod tests {
             .map(|i| alpha * u[i] + w.get(i).copied().unwrap_or_default())
             .collect();
 
-        let u_handle = Slice::new(u).handle(&srs).unwrap();
-        let w_handle = Slice::new(w).handle(&srs).unwrap();
+        let u_handle = Slice::new(u).commit(&srs).unwrap().handle();
+        let w_handle = Slice::new(w).commit(&srs).unwrap().handle();
 
         assert_eq!(
-            Slice::new(combined).handle(&srs).unwrap(),
+            Slice::new(combined).commit(&srs).unwrap().handle(),
             u_handle * alpha + w_handle
         );
     }
@@ -194,7 +254,7 @@ mod tests {
         let srs = Srs::setup(8, &mut test_rng()).unwrap();
         let error = Error::RowOutOfDomain { row: 8, size: 8 };
 
-        assert_eq!(Set::new([1, 8]).handle(&srs), Err(error.clone()));
-        assert_eq!(Slice::new(vec![Fr::ONE; 9]).handle(&srs), Err(error));
+        assert_eq!(Set::new([1, 8]).commit(&srs).err(), Some(error.clone()));
+        assert_eq!(Slice::new(vec![Fr::ONE; 9]).commit(&srs).err(), Some(error));
     }
 }

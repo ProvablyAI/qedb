@@ -9,7 +9,7 @@
 //! batched with a challenge `ρ` as `e([q]₁ + ρ[1]₁, [P_S]₂) = e([v]₁ + ρS̃, [1]₂)`.
 
 use crate::Error;
-use crate::handle::{Set, SetHandle, Slice, SliceHandle};
+use crate::handle::{CommittedSet, CommittedSlice, SetHandle, SliceHandle};
 use crate::setup::{Domain, Srs};
 use crate::transcript::Transcript;
 use ark_bls12_381::{Bls12_381, Fr, G1Projective, G2Projective};
@@ -31,17 +31,16 @@ pub struct ZeroTestProof {
 }
 
 impl ZeroTestProof {
-    /// Proves `v[S] = 0`, given `v`, `S` and their handles.
+    /// Proves `v[S] = 0`.
     pub fn prove(
         srs: &Srs,
-        v: &Slice,
-        v_handle: SliceHandle,
-        s: &Set,
-        s_handle: SetHandle,
+        v: &CommittedSlice,
+        s: &CommittedSet,
         transcript: &mut Transcript,
     ) -> Result<Self, Error> {
-        let values = v.values();
+        let values = v.slice().values();
         if let Some(&row) = s
+            .set()
             .rows()
             .iter()
             .find(|&&row| values.get(row).is_some_and(|value| !value.is_zero()))
@@ -49,13 +48,12 @@ impl ZeroTestProof {
             return Err(Error::NotZero { row });
         }
 
-        let p_s = s.characteristic(srs.domain())?;
-        let q = divide_exact(&v.polynomial(srs.domain())?, &p_s)?;
+        let q = divide_exact(v.polynomial(), s.polynomial())?;
         let proof = Self {
             quotient: srs.commit_g1(&q)?,
-            set_g2: srs.commit_g2(&p_s)?,
+            set_g2: srs.commit_g2(s.polynomial())?,
         };
-        proof.challenge(v_handle, s_handle, transcript);
+        proof.challenge(v.handle(), s.handle(), transcript);
         Ok(proof)
     }
 
@@ -114,47 +112,50 @@ fn divide_exact(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::handle::{Set, Slice};
     use ark_std::test_rng;
 
-    fn handles(srs: &Srs, v: &Slice, s: &Set) -> (SliceHandle, SetHandle) {
-        (v.handle(srs).unwrap(), s.handle(srs).unwrap())
-    }
-
-    fn prove(srs: &Srs, v: &Slice, s: &Set) -> Result<ZeroTestProof, Error> {
-        let (v_handle, s_handle) = handles(srs, v, s);
-        ZeroTestProof::prove(srs, v, v_handle, s, s_handle, &mut Transcript::new("test"))
-    }
-
-    fn slice(values: &[u64]) -> Slice {
+    fn slice(srs: &Srs, values: &[u64]) -> CommittedSlice {
         Slice::new(values.iter().map(|&x| Fr::from(x)).collect())
+            .commit(srs)
+            .unwrap()
+    }
+
+    fn set(srs: &Srs, rows: impl IntoIterator<Item = usize>) -> CommittedSet {
+        Set::new(rows).commit(srs).unwrap()
+    }
+
+    fn prove(srs: &Srs, v: &CommittedSlice, s: &CommittedSet) -> Result<ZeroTestProof, Error> {
+        ZeroTestProof::prove(srs, v, s, &mut Transcript::new("test"))
+    }
+
+    fn verify(proof: &ZeroTestProof, v: &CommittedSlice, s: &CommittedSet) -> Result<(), Error> {
+        proof.verify(v.handle(), s.handle(), &mut Transcript::new("test"))
     }
 
     #[test]
     fn accepts_slices_zero_on_the_set() {
         let srs = Srs::setup(16, &mut test_rng()).unwrap();
-        let v = slice(&[5, 0, 7, 0, 9, 2]);
+        let v = slice(&srs, &[5, 0, 7, 0, 9, 2]);
 
         // Rows 6.. are after the last value, so zero.
-        for s in [Set::new([]), Set::new([1, 3]), Set::new([1, 3, 6, 15])] {
-            let (v_handle, s_handle) = handles(&srs, &v, &s);
+        for rows in [vec![], vec![1, 3], vec![1, 3, 6, 15]] {
+            let s = set(&srs, rows);
             let proof = prove(&srs, &v, &s).unwrap();
-            assert_eq!(
-                proof.verify(v_handle, s_handle, &mut Transcript::new("test")),
-                Ok(())
-            );
+            assert_eq!(verify(&proof, &v, &s), Ok(()));
         }
     }
 
     #[test]
     fn rejects_a_proof_for_another_set() {
         let srs = Srs::setup(16, &mut test_rng()).unwrap();
-        let v = slice(&[5, 0, 7, 0, 9, 2]);
-        let proof = prove(&srs, &v, &Set::new([1, 3])).unwrap();
+        let v = slice(&srs, &[5, 0, 7, 0, 9, 2]);
+        let proof = prove(&srs, &v, &set(&srs, [1, 3])).unwrap();
         // v is zero on row 6 too: only the tie between [P_S]₂ and S̃ catches the other set.
-        let (v_handle, other) = handles(&srs, &v, &Set::new([1, 3, 6]));
+        let other = set(&srs, [1, 3, 6]);
 
         assert_eq!(
-            proof.verify(v_handle, other, &mut Transcript::new("test")),
+            verify(&proof, &v, &other),
             Err(Error::Rejected("zero test"))
         );
     }
@@ -163,17 +164,14 @@ mod tests {
     fn rejects_the_unbatched_product_forgery() {
         // Satisfies e(q, P₂)·e([1]₁, P₂)·e(−v − S̃, [1]₂) = 1 for any v and S (C1).
         let srs = Srs::setup(16, &mut test_rng()).unwrap();
-        let v = slice(&[5, 1, 7]);
-        let (v_handle, s_handle) = handles(&srs, &v, &Set::new([0, 1]));
+        let v = slice(&srs, &[5, 1, 7]);
+        let s = set(&srs, [0, 1]);
         let forged = ZeroTestProof {
-            quotient: v_handle.0 + s_handle.0 - G1Projective::generator(),
+            quotient: v.handle().0 + s.handle().0 - G1Projective::generator(),
             set_g2: G2Projective::generator(),
         };
 
-        assert_eq!(
-            forged.verify(v_handle, s_handle, &mut Transcript::new("test")),
-            Err(Error::Rejected("zero test"))
-        );
+        assert_eq!(verify(&forged, &v, &s), Err(Error::Rejected("zero test")));
     }
 
     #[test]
@@ -181,7 +179,7 @@ mod tests {
         let srs = Srs::setup(16, &mut test_rng()).unwrap();
 
         assert_eq!(
-            prove(&srs, &slice(&[5, 0, 7]), &Set::new([1, 2])),
+            prove(&srs, &slice(&srs, &[5, 0, 7]), &set(&srs, [1, 2])),
             Err(Error::NotZero { row: 2 })
         );
     }
