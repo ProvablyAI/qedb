@@ -4,6 +4,7 @@ pub mod complement;
 mod coprime;
 pub mod inner_product;
 pub mod intersection;
+pub mod read;
 pub mod subset;
 pub mod union;
 pub mod zero_test;
@@ -11,7 +12,7 @@ pub mod zero_test;
 use crate::Error;
 use crate::setup::Domain;
 use ark_bls12_381::Fr;
-use ark_ff::{FftField, batch_inversion};
+use ark_ff::{FftField, Zero, batch_inversion};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain};
 use rayon::prelude::*;
@@ -37,4 +38,17 @@ pub(crate) fn divide_exact(
         .zip(&p_evals)
         .for_each(|(v, p_inv)| *v *= p_inv);
     Ok(DensePolynomial::from_coefficients_vec(coset.ifft(&evals)))
+}
+
+/// `p / (x − r)`, without the remainder `p(r)`: synthetic division.
+pub(crate) fn divide_by_linear(p: &DensePolynomial<Fr>, r: Fr) -> DensePolynomial<Fr> {
+    let mut q = vec![Fr::zero(); p.coeffs.len().saturating_sub(1)];
+    let mut carry = Fr::zero();
+    for (i, c) in p.coeffs.iter().enumerate().rev() {
+        carry = carry * r + c;
+        if i > 0 {
+            q[i - 1] = carry;
+        }
+    }
+    DensePolynomial::from_coefficients_vec(q)
 }

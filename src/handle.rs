@@ -165,6 +165,23 @@ impl CommittedSlice {
     }
 }
 
+/// `u − v`, with the handle `ũ − ṽ` computed homomorphically.
+impl Sub for &CommittedSlice {
+    type Output = CommittedSlice;
+
+    fn sub(self, rhs: Self) -> CommittedSlice {
+        let (u, v) = (self.slice.values(), rhs.slice.values());
+        let values = (0..u.len().max(v.len()))
+            .map(|i| u.get(i).copied().unwrap_or_default() - v.get(i).copied().unwrap_or_default())
+            .collect();
+        CommittedSlice {
+            slice: Slice(values),
+            polynomial: &self.polynomial - &rhs.polynomial,
+            handle: self.handle - rhs.handle,
+        }
+    }
+}
+
 /// Handle to a set: the accumulator `[P_S(τ)]₁`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct SetHandle(pub(crate) G1Projective);
