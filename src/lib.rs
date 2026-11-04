@@ -2,6 +2,7 @@
 
 #![warn(missing_docs)]
 
+pub mod basic;
 pub mod handle;
 pub mod setup;
 pub mod transcript;
@@ -27,6 +28,13 @@ pub enum Error {
         /// Rows in the domain.
         size: usize,
     },
+    /// The prover's slice is not zero on a row where it must be.
+    NotZero {
+        /// The row.
+        row: usize,
+    },
+    /// The verifier rejected a proof of the named test.
+    Rejected(&'static str),
 }
 
 impl fmt::Display for Error {
@@ -42,6 +50,8 @@ impl fmt::Display for Error {
             Self::RowOutOfDomain { row, size } => {
                 write!(f, "row {row} is outside the domain of {size} rows")
             }
+            Self::NotZero { row } => write!(f, "the slice is not zero on row {row}"),
+            Self::Rejected(test) => write!(f, "{test}: verification failed"),
         }
     }
 }
