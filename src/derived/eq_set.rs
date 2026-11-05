@@ -13,6 +13,7 @@
 //! 3. one sign check of `(Δ − 1)[X₊] ≥ 0` and `(−Δ − 1)[X₋] ≥ 0`: `Δ > 0` on `X₊` and `Δ < 0` on
 //!    `X₋`, for integers in `(−2^ℓ, 2^ℓ]`.
 
+use super::is_negative;
 use super::sign_check::SignCheckProof;
 use crate::Error;
 use crate::basic::complement::ComplementProof;
@@ -62,10 +63,10 @@ impl EqSetProof {
             let value = values.get(row).copied().unwrap_or_default();
             if value.is_zero() {
                 zero.push(row);
-            } else if value.into_bigint() <= Fr::MODULUS_MINUS_ONE_DIV_TWO {
-                greater.push(row);
-            } else {
+            } else if is_negative(value) {
                 less.push(row);
+            } else {
+                greater.push(row);
             }
         }
         if Set::new(zero) != *x0.set() {
