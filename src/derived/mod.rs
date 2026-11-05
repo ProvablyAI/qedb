@@ -2,4 +2,5 @@
 
 pub mod nullifying;
 pub mod range_check;
+pub mod sign_check;
 pub mod sum_check;
