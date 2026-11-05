@@ -21,10 +21,9 @@ use crate::basic::zero_test::ZeroTestProof;
 use crate::handle::{
     CommittedSet, CommittedSlice, Set, SetHandle, SliceHandle, Universe, UniverseHandle,
 };
-use crate::setup::Srs;
+use crate::setup::{Srs, VerifierKey};
 use crate::transcript::Transcript;
-use ark_bls12_381::Fr;
-use ark_ff::{PrimeField, Zero};
+use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 /// Proof that a set is the set of rows where a slice is zero.
@@ -103,7 +102,7 @@ impl EqSetProof {
     /// Verifies that `X₀` is the set of rows of `universe` where the slice `Δ` is zero.
     pub fn verify(
         &self,
-        srs: &Srs,
+        vk: &VerifierKey,
         universe: UniverseHandle,
         delta: SliceHandle,
         x0: SetHandle,
@@ -121,7 +120,7 @@ impl EqSetProof {
                     .verify(self.different, self.greater, self.less, transcript)
             })
             .and_then(|()| self.zero_test.verify(delta, x0, transcript))
-            .and_then(|()| self.sign_check.verify(srs, &parts, ell, transcript))
+            .and_then(|()| self.sign_check.verify(vk, &parts, ell, transcript))
             .map_err(|_| Error::Rejected("eqSet"))
     }
 }
@@ -130,6 +129,7 @@ impl EqSetProof {
 mod tests {
     use super::*;
     use crate::handle::Slice;
+    use ark_bls12_381::Fr;
     use ark_std::test_rng;
 
     const ELL: usize = 8;
@@ -173,7 +173,7 @@ mod tests {
     ) -> Result<(), Error> {
         let transcript = &mut Transcript::new("test");
         proof.verify(
-            &s.srs,
+            &s.srs.verifier_key(),
             s.universe.handle(),
             delta.handle(),
             x0.handle(),
@@ -259,7 +259,9 @@ mod tests {
                 (delta.handle() - ones.handle(), greater.handle()),
                 (-delta.handle() - ones.handle(), less.handle()),
             ];
-            let _ = honest.sign_check.verify(srs, &parts, ELL, transcript);
+            let _ = honest
+                .sign_check
+                .verify(&srs.verifier_key(), &parts, ELL, transcript);
             honest.sign_check.clone()
         } else {
             let parts = [(&(delta - ones), greater), (&(&-delta - ones), less)];

@@ -14,7 +14,7 @@ use crate::basic::inner_product::InnerProductProof;
 use crate::handle::{
     CommittedSet, CommittedSlice, SetHandle, Slice, SliceHandle, Universe, UniverseHandle,
 };
-use crate::setup::Srs;
+use crate::setup::{Srs, VerifierKey};
 use crate::transcript::Transcript;
 use ark_bls12_381::Fr;
 use ark_ff::{Field, Zero};
@@ -76,7 +76,7 @@ impl SumCheckProof {
     /// Verifies `Σ_{j ∈ X} vⱼ = y` for the slice and set of the given handles.
     pub fn verify(
         &self,
-        srs: &Srs,
+        vk: &VerifierKey,
         universe: UniverseHandle,
         v: SliceHandle,
         x: SetHandle,
@@ -96,7 +96,7 @@ impl SumCheckProof {
             )
             .and_then(|()| {
                 self.inner_product
-                    .verify(srs, v, self.indicator, y, transcript)
+                    .verify(vk, v, self.indicator, y, transcript)
             })
             .map_err(|_| Error::Rejected("sum check"))
     }
@@ -145,7 +145,7 @@ mod tests {
     ) -> Result<(), Error> {
         let transcript = &mut Transcript::new("test");
         proof.verify(
-            &s.srs,
+            &s.srs.verifier_key(),
             s.universe.handle(),
             v.handle(),
             x.handle(),

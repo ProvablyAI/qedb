@@ -187,6 +187,19 @@ impl CommittedSlice {
     }
 }
 
+/// `α·v`, with the handle `α·ṽ` computed homomorphically.
+impl Mul<Fr> for &CommittedSlice {
+    type Output = CommittedSlice;
+
+    fn mul(self, alpha: Fr) -> CommittedSlice {
+        CommittedSlice {
+            slice: Slice(self.slice.values().iter().map(|x| *x * alpha).collect()),
+            polynomial: &self.polynomial * alpha,
+            handle: self.handle * alpha,
+        }
+    }
+}
+
 /// `−v`, with the handle `−ṽ` computed homomorphically.
 impl Neg for &CommittedSlice {
     type Output = CommittedSlice;

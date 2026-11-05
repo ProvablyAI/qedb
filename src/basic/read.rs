@@ -16,7 +16,7 @@ use super::divide_by_linear;
 use super::zero_test::ZeroTestProof;
 use crate::Error;
 use crate::handle::{CommittedSet, CommittedSlice, SetHandle, Slice, SliceHandle};
-use crate::setup::{Domain, Srs};
+use crate::setup::{Domain, Srs, VerifierKey};
 use crate::transcript::Transcript;
 use ark_bls12_381::{Bls12_381, Fr, G1Projective, G2Projective};
 use ark_ec::PrimeGroup;
@@ -66,14 +66,14 @@ impl ReadProof {
     /// in increasing order.
     pub fn verify(
         &self,
-        srs: &Srs,
+        vk: &VerifierKey,
         v: SliceHandle,
         x: SetHandle,
         rows: &[usize],
         values: &[Fr],
         transcript: &mut Transcript,
     ) -> Result<(), Error> {
-        let domain = srs.domain();
+        let domain = vk.domain();
         if rows.len() != values.len()
             || !rows.windows(2).all(|pair| pair[0] < pair[1])
             || rows.last().is_some_and(|&row| row >= domain.size())
@@ -91,10 +91,7 @@ impl ReadProof {
                 self.sparse.0 + x.0 * gamma - g1 * y + self.opening * r,
                 -self.opening,
             ],
-            [
-                G2Projective::generator(),
-                G2Projective::from(srs.g2_powers()[1]),
-            ],
+            [G2Projective::generator(), G2Projective::from(vk.tau)],
         );
         if !check.is_zero() {
             return Err(Error::Rejected("read"));
@@ -205,7 +202,14 @@ mod tests {
         values: &[Fr],
     ) -> Result<(), Error> {
         let transcript = &mut Transcript::new("test");
-        proof.verify(srs, v.handle(), x.handle(), rows, values, transcript)
+        proof.verify(
+            &srs.verifier_key(),
+            v.handle(),
+            x.handle(),
+            rows,
+            values,
+            transcript,
+        )
     }
 
     #[test]

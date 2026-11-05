@@ -5,6 +5,7 @@ use ark_bls12_381::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{PrimeGroup, ScalarMul, VariableBaseMSM};
 use ark_ff::{Field, UniformRand};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::Rng;
 use std::iter;
 
@@ -53,9 +54,33 @@ impl Srs {
         commit(&self.g2, coeffs)
     }
 
-    /// `[τⁱ]₂` for `i = 0, …, N`.
-    pub(crate) fn g2_powers(&self) -> &[G2Affine] {
-        &self.g2
+    /// The part of the SRS the verifier needs.
+    pub fn verifier_key(&self) -> VerifierKey {
+        VerifierKey {
+            domain: self.domain,
+            tau: self.g2[1],
+            tau_squared: self.g2[2],
+            tau_n: self.g2[self.domain.size()],
+        }
+    }
+}
+
+/// What the verifier needs from the SRS: the domain, `[τ]₂`, `[τ²]₂` and `[τᴺ]₂`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
+pub struct VerifierKey {
+    domain: Domain,
+    /// `[τ]₂`.
+    pub(crate) tau: G2Affine,
+    /// `[τ²]₂`.
+    pub(crate) tau_squared: G2Affine,
+    /// `[τᴺ]₂`.
+    pub(crate) tau_n: G2Affine,
+}
+
+impl VerifierKey {
+    /// The evaluation domain `H`.
+    pub const fn domain(&self) -> &Domain {
+        &self.domain
     }
 }
 

@@ -17,7 +17,7 @@
 use crate::Error;
 use crate::basic::divide_by_linear;
 use crate::handle::{CommittedSlice, SliceHandle};
-use crate::setup::{Domain, Srs};
+use crate::setup::{Domain, Srs, VerifierKey};
 use crate::transcript::Transcript;
 use ark_bls12_381::{Bls12_381, Fr, G1Projective, G2Projective};
 use ark_ec::pairing::Pairing;
@@ -118,7 +118,7 @@ impl RangeCheckProof {
     /// Verifies that every value of the slice `ṽ` is in `[0, 2^ℓ)`, with `ℓ = ell ≤ MAX_BITS`.
     pub fn verify(
         &self,
-        srs: &Srs,
+        vk: &VerifierKey,
         v: SliceHandle,
         ell: usize,
         transcript: &mut Transcript,
@@ -147,7 +147,7 @@ impl RangeCheckProof {
             .iter()
             .rev()
             .fold(Fr::zero(), |acc, y| acc * rho + *y * (*y - Fr::ONE));
-        if bit_check != srs.domain().evaluate_vanishing_polynomial(gamma) * self.quotient_value {
+        if bit_check != vk.domain().evaluate_vanishing_polynomial(gamma) * self.quotient_value {
             return reject;
         }
 
@@ -171,10 +171,7 @@ impl RangeCheckProof {
                 combined - G1Projective::generator() * value + self.opening * gamma,
                 -self.opening,
             ],
-            [
-                G2Projective::generator(),
-                G2Projective::from(srs.g2_powers()[1]),
-            ],
+            [G2Projective::generator(), G2Projective::from(vk.tau)],
         );
         if !check.is_zero() {
             return reject;
@@ -292,7 +289,12 @@ mod tests {
         v: &CommittedSlice,
         ell: usize,
     ) -> Result<(), Error> {
-        proof.verify(srs, v.handle(), ell, &mut Transcript::new("test"))
+        proof.verify(
+            &srs.verifier_key(),
+            v.handle(),
+            ell,
+            &mut Transcript::new("test"),
+        )
     }
 
     /// A proof whose bit polynomials are `bits` (not necessarily bits) and whose quotient is 0,

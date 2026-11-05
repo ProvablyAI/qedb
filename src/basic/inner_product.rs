@@ -14,7 +14,7 @@
 
 use crate::Error;
 use crate::handle::{CommittedSlice, SliceHandle};
-use crate::setup::Srs;
+use crate::setup::{Srs, VerifierKey};
 use crate::transcript::Transcript;
 use ark_bls12_381::{Bls12_381, Fr, G1Projective, G2Projective};
 use ark_ec::PrimeGroup;
@@ -75,7 +75,7 @@ impl InnerProductProof {
     /// Verifies `⟨u, v⟩ = y` for the slices of the given handles.
     pub fn verify(
         &self,
-        srs: &Srs,
+        vk: &VerifierKey,
         u: SliceHandle,
         v: SliceHandle,
         y: Fr,
@@ -84,11 +84,10 @@ impl InnerProductProof {
         let rho = self.challenge(u, v, y, transcript);
         let rho2 = rho.square();
         let g1 = G1Projective::generator();
-        let powers = srs.g2_powers();
-        let domain = srs.domain();
-        let tau = G2Projective::from(powers[1]);
-        let tau2 = G2Projective::from(powers[2]);
-        let z_h = G2Projective::from(powers[domain.size as usize]) - powers[0];
+        let domain = vk.domain();
+        let tau = G2Projective::from(vk.tau);
+        let tau2 = G2Projective::from(vk.tau_squared);
+        let z_h = G2Projective::from(vk.tau_n) - G2Projective::generator();
 
         // Equation 1 + ρ·(2) + ρ²·(3), grouped by the G2 element.
         let check = Bls12_381::multi_pairing(
@@ -149,7 +148,8 @@ mod tests {
         v: &CommittedSlice,
         y: Fr,
     ) -> Result<(), Error> {
-        proof.verify(srs, u.handle(), v.handle(), y, &mut Transcript::new("test"))
+        let vk = &srs.verifier_key();
+        proof.verify(vk, u.handle(), v.handle(), y, &mut Transcript::new("test"))
     }
 
     #[test]

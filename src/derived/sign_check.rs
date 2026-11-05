@@ -24,7 +24,7 @@ use super::range_check::RangeCheckProof;
 use crate::Error;
 use crate::basic::zero_test::ZeroTestProof;
 use crate::handle::{CommittedSet, CommittedSlice, SetHandle, Slice, SliceHandle};
-use crate::setup::Srs;
+use crate::setup::{Srs, VerifierKey};
 use crate::transcript::Transcript;
 use ark_bls12_381::Fr;
 use ark_ff::Zero;
@@ -80,7 +80,7 @@ impl SignCheckProof {
     /// Verifies `vⱼ[Xⱼ] ≥ 0` for the pairs of handles in `parts`, with values in `[0, 2^ℓ)`.
     pub fn verify(
         &self,
-        srs: &Srs,
+        vk: &VerifierKey,
         parts: &[(SliceHandle, SetHandle)],
         ell: usize,
         transcript: &mut Transcript,
@@ -95,7 +95,7 @@ impl SignCheckProof {
                 .map_err(|_| reject())?;
         }
         self.range_check
-            .verify(srs, self.remainder, ell, transcript)
+            .verify(vk, self.remainder, ell, transcript)
             .map_err(|_| reject())
     }
 }
@@ -149,7 +149,12 @@ mod tests {
             .iter()
             .map(|(v, x)| (v.handle(), x.handle()))
             .collect();
-        proof.verify(&s.srs, &parts, ELL, &mut Transcript::new("test"))
+        proof.verify(
+            &s.srs.verifier_key(),
+            &parts,
+            ELL,
+            &mut Transcript::new("test"),
+        )
     }
 
     /// A proof with the given remainder and zero tests, and a range check of `range_of` made on
