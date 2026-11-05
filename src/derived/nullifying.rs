@@ -13,7 +13,9 @@
 use crate::Error;
 use crate::basic::complement::ComplementProof;
 use crate::basic::zero_test::ZeroTestProof;
-use crate::handle::{CommittedSet, CommittedSlice, Set, SetHandle, SliceHandle};
+use crate::handle::{
+    CommittedSet, CommittedSlice, SetHandle, SliceHandle, Universe, UniverseHandle,
+};
 use crate::setup::Srs;
 use crate::transcript::Transcript;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -35,33 +37,42 @@ impl NullifyingProof {
     /// Proves `u = v[X₀ → 0]` on the rows of `universe`.
     pub fn prove(
         srs: &Srs,
-        universe: &CommittedSet,
+        universe: &Universe,
         u: &CommittedSlice,
         v: &CommittedSlice,
         x0: &CommittedSet,
         transcript: &mut Transcript,
     ) -> Result<Self, Error> {
-        let x0_rows = x0.set().rows();
-        let complement = Set::new(
-            universe
-                .set()
-                .rows()
-                .iter()
-                .copied()
-                .filter(|row| x0_rows.binary_search(row).is_err()),
-        )
-        .commit(srs)?;
+        let complement = universe.rows().set().difference(x0.set()).commit(srs)?;
+        Self::prove_with_complement(srs, universe, u, v, x0, &complement, transcript)
+    }
+
+    /// As [`Self::prove`], with `X̄₀` already committed.
+    pub(crate) fn prove_with_complement(
+        srs: &Srs,
+        universe: &Universe,
+        u: &CommittedSlice,
+        v: &CommittedSlice,
+        x0: &CommittedSet,
+        complement: &CommittedSet,
+        transcript: &mut Transcript,
+    ) -> Result<Self, Error> {
         let witness = |error| match error {
             Error::InvalidWitness(_) => Error::InvalidWitness("nullifying test"),
             error => error,
         };
-
         Ok(Self {
             complement: complement.handle(),
-            complement_proof: ComplementProof::prove(srs, universe, x0, &complement, transcript)
-                .map_err(witness)?,
+            complement_proof: ComplementProof::prove(
+                srs,
+                universe.rows(),
+                x0,
+                complement,
+                transcript,
+            )
+            .map_err(witness)?,
             zero_on_set: ZeroTestProof::prove(srs, u, x0, transcript).map_err(witness)?,
-            equal_outside: ZeroTestProof::prove(srs, &(u - v), &complement, transcript)
+            equal_outside: ZeroTestProof::prove(srs, &(u - v), complement, transcript)
                 .map_err(witness)?,
         })
     }
@@ -69,14 +80,14 @@ impl NullifyingProof {
     /// Verifies `u = v[X₀ → 0]` on the rows of `universe`, for the given handles.
     pub fn verify(
         &self,
-        universe: SetHandle,
+        universe: UniverseHandle,
         u: SliceHandle,
         v: SliceHandle,
         x0: SetHandle,
         transcript: &mut Transcript,
     ) -> Result<(), Error> {
         self.complement_proof
-            .verify(universe, x0, self.complement, transcript)
+            .verify(universe.rows, x0, self.complement, transcript)
             .and_then(|()| self.zero_on_set.verify(u, x0, transcript))
             .and_then(|()| {
                 self.equal_outside
@@ -89,7 +100,7 @@ impl NullifyingProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::handle::Slice;
+    use crate::handle::{Set, Slice};
     use ark_bls12_381::Fr;
     use ark_std::test_rng;
 
@@ -98,13 +109,13 @@ mod tests {
 
     struct Setup {
         srs: Srs,
-        universe: CommittedSet,
+        universe: Universe,
         v: CommittedSlice,
     }
 
     fn setup() -> Setup {
         let srs = Srs::setup(16, &mut test_rng()).unwrap();
-        let universe = Set::new(0..ROWS).commit(&srs).unwrap();
+        let universe = Universe::new(&srs, ROWS).unwrap();
         let v = slice(&srs, |row| row as u64 + 1);
         Setup { srs, universe, v }
     }
