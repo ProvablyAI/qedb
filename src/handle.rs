@@ -187,6 +187,19 @@ impl CommittedSlice {
     }
 }
 
+/// `−v`, with the handle `−ṽ` computed homomorphically.
+impl Neg for &CommittedSlice {
+    type Output = CommittedSlice;
+
+    fn neg(self) -> CommittedSlice {
+        CommittedSlice {
+            slice: Slice(self.slice.values().iter().map(|x| -*x).collect()),
+            polynomial: -self.polynomial.clone(),
+            handle: -self.handle,
+        }
+    }
+}
+
 /// `u − v`, with the handle `ũ − ṽ` computed homomorphically.
 impl Sub for &CommittedSlice {
     type Output = CommittedSlice;
