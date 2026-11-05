@@ -12,10 +12,7 @@ Thank you for your interest in making QEDB better! We welcome all contributions,
 ## Code Contribution Workflow
 1. **Fork** the repository and create a feature branch off `main`.
 2. **Write idiomatic Rust** following the style and safety guidelines below.
-3. **Run checks locally** before pushing:
-   1. Run `cargo test` to execute unit, integration, and doc tests.
-   2. Run `cargo fmt --check` to verify code layout.
-   3. Run `cargo clippy --all-targets -- -D warnings` to catch common code quality issues.
+3. **Run `make check`** before pushing. It runs the same checks as CI: formatting, clippy (with the `nursery` lints), the tests (doc tests included) and the documentation build. The toolchain is pinned in `rust-toolchain.toml` and installed by `rustup` on first use.
 4. **Add or update tests** to cover your changes. Bug fixes should include a regression test that fails before the fix.
 5. **Document public interfaces** using Rustdoc attribute syntax (`///`).
 6. **Open a Pull Request** with a concise description of your changes, your motivation, and a note on any potential breaking changes.
