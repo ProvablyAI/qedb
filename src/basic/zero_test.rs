@@ -48,7 +48,7 @@ impl ZeroTestProof {
         let q = divide_exact(v.polynomial(), s.polynomial())?;
         let proof = Self {
             quotient: srs.commit_g1(&q)?,
-            set_g2: srs.commit_g2(s.polynomial())?,
+            set_g2: s.handle_g2(srs)?,
         };
         proof.challenge(v.handle(), s.handle(), transcript);
         Ok(proof)

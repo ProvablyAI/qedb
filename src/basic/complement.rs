@@ -41,7 +41,7 @@ impl ComplementProof {
         }
 
         let proof = Self {
-            complement_g2: srs.commit_g2(y.polynomial())?,
+            complement_g2: y.handle_g2(srs)?,
         };
         proof.challenge(universe.handle(), x.handle(), y.handle(), transcript);
         Ok(proof)

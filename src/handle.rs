@@ -5,13 +5,14 @@
 
 use crate::Error;
 use crate::setup::{Domain, Srs};
-use ark_bls12_381::{Fr, G1Projective};
+use ark_bls12_381::{Fr, G1Projective, G2Projective};
 use ark_ff::{Field, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rayon::prelude::*;
 use std::ops::{Add, Mul, Neg, Sub};
+use std::sync::OnceLock;
 
 /// Up to this many roots, [`product_of_roots`] multiplies the factors one at a time instead of
 /// splitting further: for small polynomials this is faster than an FFT multiplication.
@@ -55,6 +56,7 @@ impl Set {
             set: self,
             polynomial,
             handle,
+            handle_g2: OnceLock::new(),
         })
     }
 }
@@ -65,6 +67,7 @@ pub struct CommittedSet {
     set: Set,
     polynomial: DensePolynomial<Fr>,
     handle: SetHandle,
+    handle_g2: OnceLock<G2Projective>,
 }
 
 impl CommittedSet {
@@ -81,6 +84,15 @@ impl CommittedSet {
     /// The handle `S̃`.
     pub const fn handle(&self) -> SetHandle {
         self.handle
+    }
+
+    /// `[P_S(τ)]₂`, computed on first use: several tests on the same set send it.
+    pub(crate) fn handle_g2(&self, srs: &Srs) -> Result<G2Projective, Error> {
+        if let Some(&g2) = self.handle_g2.get() {
+            return Ok(g2);
+        }
+        let g2 = srs.commit_g2(&self.polynomial)?;
+        Ok(*self.handle_g2.get_or_init(|| g2))
     }
 }
 

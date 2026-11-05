@@ -3,6 +3,7 @@
 #![warn(missing_docs)]
 
 pub mod basic;
+pub mod derived;
 mod error;
 pub mod handle;
 pub mod setup;
