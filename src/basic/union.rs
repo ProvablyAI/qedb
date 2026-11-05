@@ -33,17 +33,9 @@ impl UnionProof {
             return Err(Error::InvalidWitness("union test"));
         }
 
-        let rows = union.set().rows();
         let leftovers: Vec<Set> = sets
             .iter()
-            .map(|set| {
-                let set = set.set().rows();
-                Set::new(
-                    rows.iter()
-                        .copied()
-                        .filter(|row| set.binary_search(row).is_err()),
-                )
-            })
+            .map(|set| union.set().difference(set.set()))
             .collect();
         let proof = Self(CoprimeProof::prove(srs, &leftovers, "union test")?);
         let handles: Vec<SetHandle> = sets.iter().map(|set| set.handle()).collect();

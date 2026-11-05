@@ -36,6 +36,15 @@ impl Set {
         &self.0
     }
 
+    /// The rows of `self` that are not in `other`.
+    pub fn difference(&self, other: &Self) -> Self {
+        let rows = self.0.iter().copied();
+        Self(
+            rows.filter(|row| other.0.binary_search(row).is_err())
+                .collect(),
+        )
+    }
+
     /// The characteristic polynomial `P_S(x) = ∏_{i ∈ S} (x − ωⁱ)`.
     pub fn characteristic(&self, domain: &Domain) -> Result<DensePolynomial<Fr>, Error> {
         if let Some(&row) = self.0.last().filter(|&&row| row >= domain.size()) {
@@ -193,6 +202,51 @@ impl Sub for &CommittedSlice {
             handle: self.handle - rhs.handle,
         }
     }
+}
+
+/// The public handles of a table's indexing (Table 2): its rows `∗ = {0, …, n − 1}` and the
+/// all-ones slice `1` on them.
+#[derive(Clone, Debug)]
+pub struct Universe {
+    rows: CommittedSet,
+    ones: CommittedSlice,
+}
+
+impl Universe {
+    /// The universe of a table of `n` rows.
+    pub fn new(srs: &Srs, n: usize) -> Result<Self, Error> {
+        Ok(Self {
+            rows: Set::new(0..n).commit(srs)?,
+            ones: Slice::new(vec![Fr::ONE; n]).commit(srs)?,
+        })
+    }
+
+    /// The rows `∗`.
+    pub const fn rows(&self) -> &CommittedSet {
+        &self.rows
+    }
+
+    /// The all-ones slice `1`.
+    pub const fn ones(&self) -> &CommittedSlice {
+        &self.ones
+    }
+
+    /// The handles of `∗` and `1`.
+    pub const fn handle(&self) -> UniverseHandle {
+        UniverseHandle {
+            rows: self.rows.handle(),
+            ones: self.ones.handle(),
+        }
+    }
+}
+
+/// Handles of a [`Universe`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
+pub struct UniverseHandle {
+    /// The rows `∗`.
+    pub rows: SetHandle,
+    /// The all-ones slice `1`.
+    pub ones: SliceHandle,
 }
 
 /// Handle to a set: the accumulator `[P_S(τ)]₁`.

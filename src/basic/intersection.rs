@@ -38,15 +38,7 @@ impl IntersectionProof {
 
         let differences: Vec<Set> = sets
             .iter()
-            .map(|set| {
-                Set::new(
-                    set.set()
-                        .rows()
-                        .iter()
-                        .copied()
-                        .filter(|row| rows.binary_search(row).is_err()),
-                )
-            })
+            .map(|set| set.set().difference(intersection.set()))
             .collect();
         let proof = Self(CoprimeProof::prove(srs, &differences, "intersection test")?);
         let handles: Vec<SetHandle> = sets.iter().map(|set| set.handle()).collect();

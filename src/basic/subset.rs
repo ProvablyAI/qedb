@@ -4,7 +4,7 @@
 //! checks `e(T̃, [P_{S∖T}]₂) = e(S̃, [1]₂)`, i.e. `P_T · P_{S∖T} = P_S`.
 
 use crate::Error;
-use crate::handle::{CommittedSet, Set, SetHandle};
+use crate::handle::{CommittedSet, SetHandle};
 use crate::setup::Srs;
 use crate::transcript::Transcript;
 use ark_bls12_381::{Bls12_381, G2Projective};
@@ -33,12 +33,7 @@ impl SubsetProof {
             return Err(Error::InvalidWitness("subset test"));
         }
 
-        let difference = Set::new(
-            s_rows
-                .iter()
-                .copied()
-                .filter(|row| t_rows.binary_search(row).is_err()),
-        );
+        let difference = s.set().difference(t.set());
         let proof = Self {
             difference_g2: srs.commit_g2(&difference.characteristic(srs.domain())?)?,
         };
@@ -72,6 +67,7 @@ impl SubsetProof {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::handle::Set;
     use ark_std::test_rng;
 
     fn set(srs: &Srs, rows: impl IntoIterator<Item = usize>) -> CommittedSet {
