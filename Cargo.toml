@@ -18,3 +18,7 @@ ark-serialize = { version = "0.6", features = ["derive", "parallel"] }
 ark-std = { version = "0.6", features = ["parallel"] }
 rayon = "1"
 sha2 = "0.11"
+
+[[bench]]
+name = "transactions"
+harness = false
