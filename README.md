@@ -113,7 +113,8 @@ The toolchain (Rust 1.97) is pinned in `rust-toolchain.toml`. See
 
 - The code has not been audited.
 - `Srs::setup` samples the secret `τ` itself, so whoever runs it can forge proofs: use it for
-  tests and benchmarks. In production the powers of `τ` must come from a trusted-setup ceremony.
+  tests and benchmarks. In production the powers of `τ` must come from a trusted-setup ceremony,
+  loaded with `Srs::from_powers`.
 - The range and sign checks prove that values are integers in `[0, 2^ℓ)`, with `ℓ` chosen by
   the caller (at most 254).
 

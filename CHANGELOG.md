@@ -10,7 +10,8 @@ First release: the primitives of qedb ([ePrint 2025/1408](https://eprint.iacr.or
 
 ### Added
 
-- `setup`: the structured reference string `Srs`, with `commit_g1` and `commit_g2`, and the `VerifierKey`.
+- `setup`: the structured reference string `Srs`, with `commit_g1` and `commit_g2`, `from_powers`
+  to load existing powers, and the `VerifierKey`.
 - `handle`: `Set` and `Slice`, committed as `CommittedSet` and `CommittedSlice`; their handles `SetHandle` and `SliceHandle`, with the homomorphism `α·u + w`; the `Universe` of a table (its rows and the all-ones slice) and its `UniverseHandle`.
 - `transcript`: the Fiat–Shamir `Transcript`.
 - `basic`: the tests of Fig. 8: `SubsetProof`, `ComplementProof`, `IntersectionProof`, `UnionProof`, `ZeroTestProof`, `InnerProductProof` and `ReadProof`.

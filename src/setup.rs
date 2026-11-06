@@ -39,6 +39,28 @@ impl Srs {
         })
     }
 
+    /// The SRS of the powers `[τⁱ]₁` and `[τⁱ]₂`, `i = 0, …, N`, for example from a ceremony or
+    /// from storage. `N` must be a power of two, at least 2. The powers are not checked: they
+    /// must come from a trusted source. A prefix of an SRS is the SRS of a smaller domain.
+    pub fn from_powers(g1: Vec<G1Affine>, g2: Vec<G2Affine>) -> Result<Self, Error> {
+        let n = g1.len().saturating_sub(1);
+        let domain = Domain::new(n)
+            .filter(|domain| domain.size() == n && n >= 2 && g2.len() == g1.len())
+            .ok_or(Error::Domain(n))?;
+
+        Ok(Self { g1, g2, domain })
+    }
+
+    /// The powers `[τⁱ]₁`, `i = 0, …, N`.
+    pub fn g1(&self) -> &[G1Affine] {
+        &self.g1
+    }
+
+    /// The powers `[τⁱ]₂`, `i = 0, …, N`.
+    pub fn g2(&self) -> &[G2Affine] {
+        &self.g2
+    }
+
     /// The evaluation domain `H`.
     pub const fn domain(&self) -> &Domain {
         &self.domain
@@ -119,6 +141,33 @@ mod tests {
         let lhs = Bls12_381::pairing(srs.commit_g1(&p).unwrap(), G2Projective::generator());
         let rhs = Bls12_381::pairing(G1Projective::generator(), srs.commit_g2(&p).unwrap());
         assert_eq!(lhs, rhs);
+    }
+
+    #[test]
+    fn a_prefix_of_the_powers_is_a_smaller_srs() {
+        let srs = Srs::setup(8, &mut test_rng()).unwrap();
+        let small = Srs::from_powers(srs.g1()[..=4].to_vec(), srs.g2()[..=4].to_vec()).unwrap();
+
+        assert_eq!(small.domain().size(), 4);
+        assert_eq!(small.verifier_key().tau, srs.verifier_key().tau);
+        assert_eq!(small.verifier_key().tau_n, srs.g2()[4]);
+    }
+
+    #[test]
+    fn rejects_powers_without_a_domain() {
+        let srs = Srs::setup(8, &mut test_rng()).unwrap();
+        let powers = |n: usize| (srs.g1()[..n].to_vec(), srs.g2()[..n].to_vec());
+
+        for n in [0, 1, 2, 4] {
+            let (g1, g2) = powers(n);
+            assert_eq!(
+                Srs::from_powers(g1, g2).unwrap_err(),
+                Error::Domain(n.saturating_sub(1))
+            );
+        }
+        let (g1, _) = powers(5);
+        let (_, g2) = powers(3);
+        assert_eq!(Srs::from_powers(g1, g2).unwrap_err(), Error::Domain(4));
     }
 
     #[test]
