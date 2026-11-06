@@ -3,10 +3,13 @@ name = "qedb-primitives"
 version = "0.1.0"
 edition = "2024"
 authors = ["Provably Technologies"]
-description = "Expressive and Modular Verifiable Databases (without SNARKs)"
+description = "Primitives of qedb, a verifiable database scheme over KZG commitments (ePrint 2025/1408)"
 homepage = "https://provably.ai/"
 repository = "https://github.com/ProvablyAI/qedb-primitives"
 license = "BUSL-1.1"
+keywords = ["verifiable-database", "kzg", "cryptography", "pairing", "bls12-381"]
+categories = ["cryptography"]
+include = ["src/**/*", "benches/**/*", "README.md", "CHANGELOG.md", "LICENSE.md"]
 rust-version = "1.97"
 
 [dependencies]
