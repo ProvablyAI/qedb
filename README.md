@@ -71,7 +71,9 @@ The tests prove the same statements as the paper's, with faster constructions:
 - the range check uses bit polynomials and one quotient, rather than bit slices and nullifying
   tests;
 - a sign check proves the slice equal to the target only on its subset, proves strict signs
-  from integrality, and serves several subsets with one range check.
+  from integrality, and serves several subsets with one range check;
+- slices and the range check's bits are committed from their values in the Lagrange basis: the
+  MSM skips zeros and is cheaper for small values such as bits and 64-bit integers.
 
 ## Benchmark
 
@@ -90,12 +92,12 @@ On an Apple M3 Pro (11 cores):
 
 | Rows | Query | Prove | Verify | Proof |
 |---|---|---|---|---|
-| 2^16 | `QTot` | 0.62 s | 6.5 ms | 1,120 B |
-| 2^16 | `QCntTx` | 4.46 s | 15.1 ms | 7,248 B |
-| 2^16 | `QMatch` (171 rows) | 0.83 s | 7.2 ms | 720 B |
-| 2^17 | `QTot` | 1.26 s | 6.5 ms | 1,120 B |
-| 2^17 | `QCntTx` | 8.37 s | 14.5 ms | 7,248 B |
-| 2^17 | `QMatch` (365 rows) | 1.53 s | 7.3 ms | 720 B |
+| 2^16 | `QTot` | 0.56 s | 6.2 ms | 1,120 B |
+| 2^16 | `QCntTx` | 2.59 s | 14.4 ms | 7,248 B |
+| 2^16 | `QMatch` (171 rows) | 0.57 s | 7.2 ms | 720 B |
+| 2^17 | `QTot` | 1.07 s | 6.1 ms | 1,120 B |
+| 2^17 | `QCntTx` | 4.76 s | 14.5 ms | 7,248 B |
+| 2^17 | `QMatch` (365 rows) | 1.03 s | 7.2 ms | 720 B |
 
 The verifier key is 572 bytes, and proof sizes do not depend on the number of rows.
 

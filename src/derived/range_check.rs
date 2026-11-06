@@ -70,32 +70,35 @@ impl RangeCheckProof {
             return Err(Error::InvalidWitness("range check"));
         }
 
-        // Sequential over the bits: the FFTs and MSMs are parallel inside.
+        // Sequential over the bits: the FFTs and MSMs are parallel inside. The bits are committed
+        // from their values in the Lagrange basis: an MSM with 0/1 scalars.
         let domain = srs.domain();
-        let bits: Vec<DensePolynomial<Fr>> = (0..ell)
+        let (bits, bit_commitments): (Vec<_>, Vec<_>) = (0..ell)
             .map(|i| {
                 if i >= top {
-                    return DensePolynomial::zero();
+                    return Ok((DensePolynomial::zero(), G1Projective::zero()));
                 }
                 let bit: Vec<Fr> = integers.iter().map(|x| Fr::from(x.get_bit(i))).collect();
-                DensePolynomial::from_coefficients_vec(domain.ifft(&bit))
+                let commitment = srs.commit_lagrange(&bit)?;
+                Ok((
+                    DensePolynomial::from_coefficients_vec(domain.ifft(&bit)),
+                    commitment,
+                ))
             })
-            .collect();
-        Self::prove_bits(srs, v.handle(), &bits, transcript)
+            .collect::<Result<Vec<_>, Error>>()?
+            .into_iter()
+            .unzip();
+        Self::prove_bits(srs, v.handle(), &bits, bit_commitments, transcript)
     }
 
-    /// The proof for the slice `ṽ` with the bit polynomials `bits`.
+    /// The proof for the slice `ṽ` with the bit polynomials `bits` and their commitments.
     fn prove_bits(
         srs: &Srs,
         v: SliceHandle,
         bits: &[DensePolynomial<Fr>],
+        bit_commitments: Vec<G1Projective>,
         transcript: &mut Transcript,
     ) -> Result<Self, Error> {
-        let bit_commitments = bits
-            .iter()
-            .map(|bit| srs.commit_g1(bit))
-            .collect::<Result<Vec<_>, _>>()?;
-
         let rho = challenge_rho(transcript, v, bits.len(), &bit_commitments);
         let quotient = bit_quotient(srs.domain(), bits, rho)?;
         let quotient_commitment = srs.commit_g1(&quotient)?;
@@ -381,8 +384,10 @@ mod tests {
                 DensePolynomial::from_coefficients_vec(srs.domain().ifft(&[bit]))
             })
             .collect();
+        let commitments = five.iter().map(|b| srs.commit_g1(b).unwrap()).collect();
         let transcript = &mut Transcript::new("test");
-        let forged = RangeCheckProof::prove_bits(&srs, v.handle(), &five, transcript).unwrap();
+        let forged =
+            RangeCheckProof::prove_bits(&srs, v.handle(), &five, commitments, transcript).unwrap();
         assert_eq!(verify(&forged, &srs, &v, ell), reject);
 
         // 2. b₀ = v, not bits, with q = 0 and honest values: only the bit check catches it.

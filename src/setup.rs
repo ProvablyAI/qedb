@@ -2,23 +2,28 @@
 
 use crate::Error;
 use ark_bls12_381::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{AffineRepr, PrimeGroup, ScalarMul, VariableBaseMSM};
-use ark_ff::{Field, UniformRand};
+use ark_ec::{AffineRepr, CurveGroup, PrimeGroup, ScalarMul, VariableBaseMSM};
+use ark_ff::{Field, UniformRand, Zero, batch_inversion};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::Rng;
+use rayon::prelude::*;
 use std::iter;
 
 /// Evaluation domain `H = {ω⁰, …, ω^(N−1)}`: row `i` is `ωⁱ`.
 pub type Domain = Radix2EvaluationDomain<Fr>;
 
-/// Powers `[τⁱ]₁` and `[τⁱ]₂` for `i = 0, …, N`, with `N` the domain size.
+/// Powers `[τⁱ]₁` and `[τⁱ]₂` for `i = 0, …, N`, with `N` the domain size, and the Lagrange basis
+/// `[λᵢ(τ)]₁` for `i < N`.
 ///
-/// Degree `N` is needed for the vanishing polynomial of a set of `N` rows.
+/// Degree `N` is needed for the vanishing polynomial of a set of `N` rows. Slices are committed in
+/// the Lagrange basis, from their values: an MSM over the non-zero values only, faster for small
+/// values (bits, 64-bit integers) than one over the coefficients.
 #[derive(Clone, Debug)]
 pub struct Srs {
     g1: Vec<G1Affine>,
     g2: Vec<G2Affine>,
+    lagrange: Vec<G1Affine>,
     domain: Domain,
 }
 
@@ -27,32 +32,70 @@ impl Srs {
     /// two, and at least 2).
     pub fn setup<R: Rng + ?Sized>(n: usize, rng: &mut R) -> Result<Self, Error> {
         let domain = Domain::new(n.max(2)).ok_or(Error::Domain(n))?;
-        let tau = Fr::rand(rng);
+        // τ ∉ H, so that λᵢ(τ) below is well defined; any other τ is drawn with negligible
+        // probability.
+        let tau = loop {
+            let tau = Fr::rand(rng);
+            if !domain.evaluate_vanishing_polynomial(tau).is_zero() {
+                break tau;
+            }
+        };
         let powers: Vec<Fr> = iter::successors(Some(Fr::ONE), |p| Some(*p * tau))
             .take(domain.size() + 1)
             .collect();
+        let g1 = G1Projective::generator();
 
         Ok(Self {
-            g1: G1Projective::generator().batch_mul(&powers),
+            g1: g1.batch_mul(&powers),
             g2: G2Projective::generator().batch_mul(&powers),
+            lagrange: g1.batch_mul(&lagrange_at(&domain, tau)),
             domain,
         })
     }
 
-    /// The SRS of the powers `[τⁱ]₁` and `[τⁱ]₂`, `i = 0, …, N`, for example from a ceremony or
-    /// from storage. `N` must be a power of two, at least 2, and the powers must start from the
-    /// generators the verifier uses. The other powers are not checked: they must come from a
-    /// trusted source. A prefix of an SRS is the SRS of a smaller domain.
+    /// The SRS of the powers `[τⁱ]₁` and `[τⁱ]₂`, `i = 0, …, N`, and the Lagrange basis
+    /// `[λᵢ(τ)]₁`, `i < N`, for example from storage or from a ceremony. `N` must be a power of
+    /// two, at least 2. The points are not checked: they must come from a trusted source.
+    pub fn new(
+        g1: Vec<G1Affine>,
+        g2: Vec<G2Affine>,
+        lagrange: Vec<G1Affine>,
+    ) -> Result<Self, Error> {
+        let domain = domain_of(&g1, &g2)?;
+        if lagrange.len() != domain.size() {
+            return Err(Error::Domain(lagrange.len()));
+        }
+
+        Ok(Self {
+            g1,
+            g2,
+            lagrange,
+            domain,
+        })
+    }
+
+    /// The SRS of the powers `[τⁱ]₁` and `[τⁱ]₂`, `i = 0, …, N`, which must start from the
+    /// generators the verifier uses. A prefix of an SRS is the SRS of a smaller domain.
+    ///
+    /// Computes the Lagrange basis from the powers, with `O(N log N)` scalar multiplications.
     pub fn from_powers(g1: Vec<G1Affine>, g2: Vec<G2Affine>) -> Result<Self, Error> {
-        let n = g1.len().saturating_sub(1);
-        let domain = Domain::new(n)
-            .filter(|domain| domain.size() == n && n >= 2 && g2.len() == g1.len())
-            .ok_or(Error::Domain(n))?;
+        let domain = domain_of(&g1, &g2)?;
         if g1[0] != G1Affine::generator() || g2[0] != G2Affine::generator() {
             return Err(Error::Generators);
         }
+        // [λᵢ(τ)]₁ = Σⱼ (ω^(−ij)/N)·[τʲ]₁: the inverse FFT of the powers.
+        let powers: Vec<G1Projective> = g1[..domain.size()]
+            .par_iter()
+            .map(|&p| p.into())
+            .collect();
+        let lagrange = G1Projective::normalize_batch(&domain.ifft(&powers));
 
-        Ok(Self { g1, g2, domain })
+        Ok(Self {
+            g1,
+            g2,
+            lagrange,
+            domain,
+        })
     }
 
     /// The powers `[τⁱ]₁`, `i = 0, …, N`.
@@ -65,9 +108,25 @@ impl Srs {
         &self.g2
     }
 
+    /// The Lagrange basis `[λᵢ(τ)]₁`, `i < N`.
+    pub fn lagrange(&self) -> &[G1Affine] {
+        &self.lagrange
+    }
+
     /// The evaluation domain `H`.
     pub const fn domain(&self) -> &Domain {
         &self.domain
+    }
+
+    /// `[v(τ)]₁` for the polynomial `v` with values `v(ωⁱ) = vᵢ`, `0` after the last value.
+    pub fn commit_lagrange(&self, values: &[Fr]) -> Result<G1Projective, Error> {
+        if values.len() > self.domain.size() {
+            return Err(Error::RowOutOfDomain {
+                row: values.len() - 1,
+                size: self.domain.size(),
+            });
+        }
+        commit(&self.lagrange, values)
     }
 
     /// `[p(τ)]₁` for `p` given by its coefficients.
@@ -111,6 +170,27 @@ impl VerifierKey {
     pub const fn domain(&self) -> &Domain {
         &self.domain
     }
+}
+
+/// The domain of the powers `g1` and `g2`, `N + 1` of each.
+fn domain_of(g1: &[G1Affine], g2: &[G2Affine]) -> Result<Domain, Error> {
+    let n = g1.len().saturating_sub(1);
+    Domain::new(n)
+        .filter(|domain| domain.size() == n && n >= 2 && g2.len() == g1.len())
+        .ok_or(Error::Domain(n))
+}
+
+/// `λᵢ(τ) = ωⁱ·(τᴺ − 1) / (N·(τ − ωⁱ))` for `i < N`, with `τ ∉ H`.
+fn lagrange_at(domain: &Domain, tau: Fr) -> Vec<Fr> {
+    let points: Vec<Fr> = domain.elements().collect();
+    let mut denominators: Vec<Fr> = points.par_iter().map(|w| tau - w).collect();
+    batch_inversion(&mut denominators);
+    let scale = domain.evaluate_vanishing_polynomial(tau) * domain.size_inv;
+    points
+        .par_iter()
+        .zip(&denominators)
+        .map(|(w, d)| *w * d * scale)
+        .collect()
 }
 
 fn commit<G: VariableBaseMSM>(bases: &[G::MulBase], coeffs: &[G::ScalarField]) -> Result<G, Error> {
@@ -190,6 +270,47 @@ mod tests {
         let mut other = g2;
         other.swap(0, 1);
         assert_eq!(Srs::from_powers(g1, other).unwrap_err(), Error::Generators);
+    }
+
+    #[test]
+    fn the_lagrange_basis_of_tau_is_the_one_of_the_powers() {
+        let srs = Srs::setup(16, &mut test_rng()).unwrap();
+        let from_powers = Srs::from_powers(srs.g1().to_vec(), srs.g2().to_vec()).unwrap();
+
+        assert_eq!(from_powers.lagrange(), srs.lagrange());
+    }
+
+    #[test]
+    fn commits_values_as_their_polynomial() {
+        let rng = &mut test_rng();
+        let srs = Srs::setup(16, rng).unwrap();
+        let domain = srs.domain();
+
+        // Shorter than the domain: zero on the last rows.
+        for len in [0, 5, 16] {
+            let values: Vec<Fr> = (0..len).map(|_| Fr::rand(rng)).collect();
+            let mut padded = values.clone();
+            padded.resize(domain.size(), Fr::zero());
+            assert_eq!(
+                srs.commit_lagrange(&values),
+                srs.commit_g1(&domain.ifft(&padded))
+            );
+        }
+        assert_eq!(
+            srs.commit_lagrange(&[Fr::ONE; 17]),
+            Err(Error::RowOutOfDomain { row: 16, size: 16 })
+        );
+    }
+
+    #[test]
+    fn takes_a_stored_lagrange_basis() {
+        let srs = Srs::setup(8, &mut test_rng()).unwrap();
+        let new = |basis: &[G1Affine]| {
+            Srs::new(srs.g1().to_vec(), srs.g2().to_vec(), basis.to_vec()).map(|srs| srs.lagrange)
+        };
+
+        assert_eq!(new(srs.lagrange()), Ok(srs.lagrange.clone()));
+        assert_eq!(new(&srs.lagrange()[..4]), Err(Error::Domain(4)));
     }
 
     #[test]

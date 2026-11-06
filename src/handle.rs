@@ -151,10 +151,11 @@ impl Slice {
         Ok(DensePolynomial::from_coefficients_vec(domain.ifft(&self.0)))
     }
 
-    /// Commits to the slice: its polynomial and the commitment `[v(τ)]₁`.
+    /// Commits to the slice: its polynomial and the commitment `[v(τ)]₁`, from the values in the
+    /// Lagrange basis.
     pub fn commit(self, srs: &Srs) -> Result<CommittedSlice, Error> {
         let polynomial = self.polynomial(srs.domain())?;
-        let handle = SliceHandle(srs.commit_g1(&polynomial)?);
+        let handle = SliceHandle(srs.commit_lagrange(&self.0)?);
         Ok(CommittedSlice {
             slice: self,
             polynomial,
