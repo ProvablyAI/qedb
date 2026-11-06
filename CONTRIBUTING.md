@@ -3,7 +3,7 @@ Thank you for your interest in making QEDB better! We welcome all contributions,
 
 
 ## Ways to Contribute
-- **Report bugs**: Open an issue on [GitHub Issues](https://github.com/ProvablyAI/qedb/issues). Include clear reproduction steps, expected vs. actual behavior, and your environment details (`rustc --version`, OS, target architecture).
+- **Report bugs**: Open an issue on [GitHub Issues](https://github.com/ProvablyAI/qedb-primitives/issues). Include clear reproduction steps, expected vs. actual behavior, and your environment details (`rustc --version`, OS, target architecture).
 - **Request features**: Open an issue describing your proposed feature and its use case. We encourage community discussion before starting work on large functional additions.
 - **Improve documentation**: Contributions for clarification, typo fixes, or missing examples are always welcome.
 - **Submit code**: Follow the development process detailed below.

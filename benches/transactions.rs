@@ -16,17 +16,17 @@
 use ark_bls12_381::Fr;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{Rng, SeedableRng, rngs::StdRng};
-use qedb::Error;
-use qedb::basic::complement::ComplementProof;
-use qedb::basic::intersection::IntersectionProof;
-use qedb::basic::read::ReadProof;
-use qedb::derived::sign_check::SignCheckProof;
-use qedb::derived::sum_check::SumCheckProof;
-use qedb::handle::{
+use qedb_primitives::Error;
+use qedb_primitives::basic::complement::ComplementProof;
+use qedb_primitives::basic::intersection::IntersectionProof;
+use qedb_primitives::basic::read::ReadProof;
+use qedb_primitives::derived::sign_check::SignCheckProof;
+use qedb_primitives::derived::sum_check::SumCheckProof;
+use qedb_primitives::handle::{
     CommittedSet, CommittedSlice, Set, SetHandle, Slice, SliceHandle, Universe, UniverseHandle,
 };
-use qedb::setup::{Srs, VerifierKey};
-use qedb::transcript::Transcript;
+use qedb_primitives::setup::{Srs, VerifierKey};
+use qedb_primitives::transcript::Transcript;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 

@@ -1,7 +1,7 @@
-# qedb: Expressive and Modular Verifiable Databases (without SNARKs)
+# qedb-primitives
 
-Which is a recursive acronym standing for ***q***edb ***e***rror-checks ***d***ata***b***ases.
-It is also a shameless pun on it being a ***proof*** system for DBs.
+The primitives of ***qedb***, which is a recursive acronym standing for ***q***edb
+***e***rror-checks ***d***ata***b***ases. It is also a shameless pun on it being a ***proof*** system for DBs.
 
 A verifiable database lets a client check the answer to a query without trusting the server
 that runs it: with the answer comes a short proof, which the client verifies against a small
@@ -38,10 +38,10 @@ A query is a sequence of tests. For example, `SELECT SUM(price) … WHERE …` i
 ```rust
 use ark_bls12_381::Fr;
 use ark_std::test_rng;
-use qedb::derived::sum_check::SumCheckProof;
-use qedb::handle::{Set, Slice, Universe};
-use qedb::setup::Srs;
-use qedb::transcript::Transcript;
+use qedb_primitives::derived::sum_check::SumCheckProof;
+use qedb_primitives::handle::{Set, Slice, Universe};
+use qedb_primitives::setup::Srs;
+use qedb_primitives::transcript::Transcript;
 
 // Setup and preprocessing: a table of 4 rows with one column.
 let srs = Srs::setup(4, &mut test_rng())?;

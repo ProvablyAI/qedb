@@ -41,12 +41,12 @@
 //! ```
 //! use ark_bls12_381::Fr;
 //! use ark_std::test_rng;
-//! use qedb::derived::sum_check::SumCheckProof;
-//! use qedb::handle::{Set, Slice, Universe};
-//! use qedb::setup::Srs;
-//! use qedb::transcript::Transcript;
+//! use qedb_primitives::derived::sum_check::SumCheckProof;
+//! use qedb_primitives::handle::{Set, Slice, Universe};
+//! use qedb_primitives::setup::Srs;
+//! use qedb_primitives::transcript::Transcript;
 //!
-//! # fn main() -> Result<(), qedb::Error> {
+//! # fn main() -> Result<(), qedb_primitives::Error> {
 //! // Setup and preprocessing: a table of 4 rows with one column.
 //! let srs = Srs::setup(4, &mut test_rng())?;
 //! let universe = Universe::new(&srs, 4)?;
