@@ -55,7 +55,8 @@ impl Srs {
 
     /// The SRS of the powers `[τⁱ]₁` and `[τⁱ]₂`, `i = 0, …, N`, and the Lagrange basis
     /// `[λᵢ(τ)]₁`, `i < N`, for example from storage or from a ceremony. `N` must be a power of
-    /// two, at least 2. The points are not checked: they must come from a trusted source.
+    /// two, at least 2, and the powers must start from the generators the verifier uses. The
+    /// other points are not checked: they must come from a trusted source.
     pub fn new(
         g1: Vec<G1Affine>,
         g2: Vec<G2Affine>,
@@ -80,9 +81,6 @@ impl Srs {
     /// Computes the Lagrange basis from the powers, with `O(N log N)` scalar multiplications.
     pub fn from_powers(g1: Vec<G1Affine>, g2: Vec<G2Affine>) -> Result<Self, Error> {
         let domain = domain_of(&g1, &g2)?;
-        if g1[0] != G1Affine::generator() || g2[0] != G2Affine::generator() {
-            return Err(Error::Generators);
-        }
         // [λᵢ(τ)]₁ = Σⱼ (ω^(−ij)/N)·[τʲ]₁: the inverse FFT of the powers.
         let powers: Vec<G1Projective> = g1[..domain.size()].par_iter().map(|&p| p.into()).collect();
         let lagrange = G1Projective::normalize_batch(&domain.ifft(&powers));
@@ -169,12 +167,16 @@ impl VerifierKey {
     }
 }
 
-/// The domain of the powers `g1` and `g2`, `N + 1` of each.
+/// The domain of the powers `g1` and `g2`, `N + 1` of each, starting from the generators.
 fn domain_of(g1: &[G1Affine], g2: &[G2Affine]) -> Result<Domain, Error> {
     let n = g1.len().saturating_sub(1);
-    Domain::new(n)
+    let domain = Domain::new(n)
         .filter(|domain| domain.size() == n && n >= 2 && g2.len() == g1.len())
-        .ok_or(Error::Domain(n))
+        .ok_or(Error::Domain(n))?;
+    if g1[0] != G1Affine::generator() || g2[0] != G2Affine::generator() {
+        return Err(Error::Generators);
+    }
+    Ok(domain)
 }
 
 /// `λᵢ(τ) = ωⁱ·(τᴺ − 1) / (N·(τ − ωⁱ))` for `i < N`, with `τ ∉ H`.
@@ -266,7 +268,14 @@ mod tests {
         );
         let mut other = g2;
         other.swap(0, 1);
-        assert_eq!(Srs::from_powers(g1, other).unwrap_err(), Error::Generators);
+        assert_eq!(
+            Srs::from_powers(g1.clone(), other.clone()).unwrap_err(),
+            Error::Generators
+        );
+        assert_eq!(
+            Srs::new(g1, other, srs.lagrange().to_vec()).unwrap_err(),
+            Error::Generators
+        );
     }
 
     #[test]
