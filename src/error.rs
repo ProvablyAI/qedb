@@ -4,6 +4,7 @@ use std::fmt;
 
 /// Errors returned by the primitives.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// No evaluation domain holds the requested number of rows.
     Domain(usize),
