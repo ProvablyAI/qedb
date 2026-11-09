@@ -11,7 +11,7 @@
 //!    i.e. `P_{X₊} · P_{X₋} = P_C`;
 //! 2. the zero test `Δ[X₀] = 0`;
 //! 3. one sign check of `(Δ − 1)[X₊] ≥ 0` and `(−Δ − 1)[X₋] ≥ 0`: `Δ > 0` on `X₊` and `Δ < 0` on
-//!    `X₋`, for integers in `(−2^ℓ, 2^ℓ]`.
+//!    `X₋`, for integers in `[−2^ℓ, 2^ℓ]`.
 
 use super::is_negative;
 use super::sign_check::SignCheckProof;
@@ -47,7 +47,7 @@ pub struct EqSetProof {
 
 impl EqSetProof {
     /// Proves that `X₀` is the set of rows of `universe` where `Δ` is zero, with the other values
-    /// in `(−2^ℓ, 2^ℓ]`.
+    /// in `[−2^ℓ, 2^ℓ]`.
     pub fn prove(
         srs: &Srs,
         universe: &Universe,
@@ -185,16 +185,26 @@ mod tests {
     #[test]
     fn accepts_the_rows_where_the_slice_is_zero() {
         let s = setup();
-        let cases: [(&[i64], Vec<usize>); 3] = [
+        let bound = 1 << ELL;
+        let cases: [(&[i64], Vec<usize>); 4] = [
             (&DELTA, ZERO.to_vec()),
             (&[], (0..12).collect()),
             (&[1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6], vec![]),
+            // The non-zero values are in [−2^ℓ, 2^ℓ].
+            (&[bound, -bound], (2..12).collect()),
         ];
 
         for (values, zero) in cases {
             let (delta, x0) = (slice(&s.srs, values), set(&s.srs, zero));
             let proof = prove(&s, &delta, &x0).unwrap();
             assert_eq!(verify(&proof, &s, &delta, &x0), Ok(()));
+        }
+        for value in [bound + 1, -bound - 1] {
+            let delta = slice(&s.srs, &[value]);
+            assert_eq!(
+                prove(&s, &delta, &set(&s.srs, 1..12)),
+                Err(Error::InvalidWitness("eqSet"))
+            );
         }
         // A wrong X₀.
         let delta = slice(&s.srs, &DELTA);
