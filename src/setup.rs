@@ -83,11 +83,12 @@ impl Srs {
             tau: self.g2[1],
             tau_squared: self.g2[2],
             tau_n: self.g2[self.domain.size()],
+            tau_n_g1: self.g1[self.domain.size()],
         }
     }
 }
 
-/// What the verifier needs from the SRS: the domain, `[τ]₂`, `[τ²]₂` and `[τᴺ]₂`.
+/// What the verifier needs from the SRS: the domain, `[τ]₂`, `[τ²]₂`, `[τᴺ]₂` and `[τᴺ]₁`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct VerifierKey {
     domain: Domain,
@@ -97,6 +98,8 @@ pub struct VerifierKey {
     pub(crate) tau_squared: G2Affine,
     /// `[τᴺ]₂`.
     pub(crate) tau_n: G2Affine,
+    /// `[τᴺ]₁`.
+    pub(crate) tau_n_g1: G1Affine,
 }
 
 impl VerifierKey {

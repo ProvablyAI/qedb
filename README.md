@@ -39,23 +39,22 @@ A query is a sequence of tests. For example, `SELECT SUM(price) … WHERE …` i
 use ark_bls12_381::Fr;
 use ark_std::test_rng;
 use qedb_primitives::derived::sum_check::SumCheckProof;
-use qedb_primitives::handle::{Set, Slice, Universe};
+use qedb_primitives::handle::{Set, Slice};
 use qedb_primitives::setup::Srs;
 use qedb_primitives::transcript::Transcript;
 
 // Setup and preprocessing: a table of 4 rows with one column.
 let srs = Srs::setup(4, &mut test_rng())?;
-let universe = Universe::new(&srs, 4)?;
 let column = Slice::new([10u64, 20, 30, 40].map(Fr::from).to_vec()).commit(&srs)?;
 
 // The prover: the selected rows 1 and 3, and the sum of the column on them.
 let rows = Set::new([1, 3]).commit(&srs)?;
-let proof = SumCheckProof::prove(&srs, &universe, &column, &rows, Fr::from(60u64),
+let proof = SumCheckProof::prove(&srs, &column, &rows, Fr::from(60u64),
     &mut Transcript::new("example"))?;
 
 // The verifier: only the verifier key and the handles.
-let (universe, column, rows) = (universe.handle(), column.handle(), rows.handle());
-proof.verify(&srs.verifier_key(), universe, column, rows, Fr::from(60u64),
+let (column, rows) = (column.handle(), rows.handle());
+proof.verify(&srs.verifier_key(), column, rows, Fr::from(60u64),
     &mut Transcript::new("example"))?;
 ```
 
@@ -98,7 +97,7 @@ On an Apple M3 Pro (11 cores):
 | 2^17 | `QCntTx` | 8.37 s | 14.5 ms | 7,248 B |
 | 2^17 | `QMatch` (365 rows) | 1.53 s | 7.3 ms | 720 B |
 
-The verifier key is 524 bytes, and proof sizes do not depend on the number of rows.
+The verifier key is 572 bytes, and proof sizes do not depend on the number of rows.
 
 ## Development
 

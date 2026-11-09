@@ -1,12 +1,13 @@
 //! Sum check within a target subset `Σ_{j ∈ X̃} ṽⱼ = y` (Table 2).
 //!
-//! The prover sends the indicator `u` of `X` and `X̄ = ∗ ∖ X`, and the verifier checks
+//! The prover sends the indicator `u` of `X` and `X̄ = H ∖ X`, and the verifier checks
 //!
-//! 1. the nullifying test `u = 1[X̄ → 0]`, whose complement of `X̄` must be the handle `X̃`: one
-//!    complement test proves both `X̄ = ∗ ∖ X` and the nullifying test's complement;
+//! 1. the nullifying test `u = 1[X̄ → 0]` on the whole domain `H`, whose complement of `X̄` must be
+//!    the handle `X̃`: one complement test proves both `X̄ = H ∖ X` and the nullifying test's
+//!    complement;
 //! 2. the inner product `⟨v, u⟩ = y`.
 //!
-//! With `v = 1`, `y` is the number of rows of `X`.
+//! With `v` the universe's all-ones slice, `y` is the number of rows of `X`.
 
 use super::nullifying::NullifyingProof;
 use crate::Error;
@@ -34,10 +35,9 @@ pub struct SumCheckProof {
 }
 
 impl SumCheckProof {
-    /// Proves `Σ_{j ∈ X} vⱼ = y`, for `X` a subset of the rows of `universe`.
+    /// Proves `Σ_{j ∈ X} vⱼ = y`.
     pub fn prove(
         srs: &Srs,
-        universe: &Universe,
         v: &CommittedSlice,
         x: &CommittedSet,
         y: Fr,
@@ -49,6 +49,7 @@ impl SumCheckProof {
             indicator[row] = Fr::ONE;
         }
         let indicator = Slice::new(indicator).commit(srs)?;
+        let universe = Universe::domain(srs);
         let complement = universe.rows().set().difference(x.set()).commit(srs)?;
         let witness = |error| match error {
             Error::InvalidWitness(_) => Error::InvalidWitness("sum check"),
@@ -60,7 +61,7 @@ impl SumCheckProof {
             complement: complement.handle(),
             nullifying: NullifyingProof::prove_with_complement(
                 srs,
-                universe,
+                &universe,
                 &indicator,
                 universe.ones(),
                 &complement,
@@ -77,7 +78,6 @@ impl SumCheckProof {
     pub fn verify(
         &self,
         vk: &VerifierKey,
-        universe: UniverseHandle,
         v: SliceHandle,
         x: SetHandle,
         y: Fr,
@@ -86,6 +86,7 @@ impl SumCheckProof {
         if self.nullifying.complement != x {
             return Err(Error::Rejected("sum check"));
         }
+        let universe = UniverseHandle::domain(vk);
         self.nullifying
             .verify(
                 universe,
@@ -133,7 +134,7 @@ mod tests {
 
     fn prove(s: &Setup, v: &CommittedSlice, x: &CommittedSet, y: u64) -> SumCheckProof {
         let transcript = &mut Transcript::new("test");
-        SumCheckProof::prove(&s.srs, &s.universe, v, x, Fr::from(y), transcript).unwrap()
+        SumCheckProof::prove(&s.srs, v, x, Fr::from(y), transcript).unwrap()
     }
 
     fn verify(
@@ -146,7 +147,6 @@ mod tests {
         let transcript = &mut Transcript::new("test");
         proof.verify(
             &s.srs.verifier_key(),
-            s.universe.handle(),
             v.handle(),
             x.handle(),
             Fr::from(y),
@@ -193,5 +193,47 @@ mod tests {
             ..honest
         };
         assert_eq!(verify(&forged, &s, &s.v, &x, 27), reject);
+    }
+
+    #[test]
+    fn checks_the_indicator_after_the_table() {
+        // A slice with a value on row 4, after a table of 4 rows, in a domain of 8.
+        let srs = Srs::setup(8, &mut test_rng()).unwrap();
+        let v = Slice::new([10, 20, 30, 40, 1000].map(Fr::from).to_vec())
+            .commit(&srs)
+            .unwrap();
+        let x = set(&srs, &[1, 3]);
+        let honest =
+            SumCheckProof::prove(&srs, &v, &x, Fr::from(60), &mut Transcript::new("test")).unwrap();
+
+        // The indicator of X ∪ {4}: its inner product with v adds the value after the table.
+        let indicator = Slice::new([0, 1, 0, 1, 1].map(Fr::from).to_vec())
+            .commit(&srs)
+            .unwrap();
+        let transcript = &mut Transcript::new("test");
+        let forged = SumCheckProof {
+            indicator: indicator.handle(),
+            inner_product: InnerProductProof::prove(
+                &srs,
+                &v,
+                &indicator,
+                Fr::from(1060),
+                transcript,
+            )
+            .unwrap(),
+            ..honest
+        };
+
+        let transcript = &mut Transcript::new("test");
+        assert_eq!(
+            forged.verify(
+                &srs.verifier_key(),
+                v.handle(),
+                x.handle(),
+                Fr::from(1060),
+                transcript
+            ),
+            Err(Error::Rejected("sum check"))
+        );
     }
 }

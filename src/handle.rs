@@ -4,8 +4,9 @@
 //! handles, [`SetHandle`] and [`SliceHandle`]. Row `i` is the domain element `ωⁱ`.
 
 use crate::Error;
-use crate::setup::{Domain, Srs};
+use crate::setup::{Domain, Srs, VerifierKey};
 use ark_bls12_381::{Fr, G1Projective, G2Projective};
+use ark_ec::PrimeGroup;
 use ark_ff::{Field, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{DenseUVPolynomial, EvaluationDomain};
@@ -264,6 +265,29 @@ impl Universe {
             ones: self.ones.handle(),
         }
     }
+
+    /// The universe of every row of the domain `H`, from closed forms: `P_H = xᴺ − 1`, and the
+    /// all-ones slice is the constant `1`.
+    pub(crate) fn domain(srs: &Srs) -> Self {
+        let n = srs.domain().size();
+        let mut z_h = vec![Fr::zero(); n + 1];
+        z_h[0] = -Fr::ONE;
+        z_h[n] = Fr::ONE;
+        let one = G1Projective::from(srs.g1()[0]);
+        Self {
+            rows: CommittedSet {
+                set: Set((0..n).collect()),
+                polynomial: DensePolynomial::from_coefficients_vec(z_h),
+                handle: SetHandle(srs.g1()[n] - one),
+                handle_g2: OnceLock::new(),
+            },
+            ones: CommittedSlice {
+                slice: Slice(vec![Fr::ONE; n]),
+                polynomial: DensePolynomial::from_coefficients_vec(vec![Fr::ONE]),
+                handle: SliceHandle(one),
+            },
+        }
+    }
 }
 
 /// Handles of a [`Universe`].
@@ -273,6 +297,17 @@ pub struct UniverseHandle {
     pub rows: SetHandle,
     /// The all-ones slice `1`.
     pub ones: SliceHandle,
+}
+
+impl UniverseHandle {
+    /// The handles of [`Universe::domain`], from the verifier key.
+    pub(crate) fn domain(vk: &VerifierKey) -> Self {
+        let one = G1Projective::generator();
+        Self {
+            rows: SetHandle(vk.tau_n_g1 - one),
+            ones: SliceHandle(one),
+        }
+    }
 }
 
 /// Handle to a set: the accumulator `[P_S(τ)]₁`.

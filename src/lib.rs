@@ -42,27 +42,26 @@
 //! use ark_bls12_381::Fr;
 //! use ark_std::test_rng;
 //! use qedb_primitives::derived::sum_check::SumCheckProof;
-//! use qedb_primitives::handle::{Set, Slice, Universe};
+//! use qedb_primitives::handle::{Set, Slice};
 //! use qedb_primitives::setup::Srs;
 //! use qedb_primitives::transcript::Transcript;
 //!
 //! # fn main() -> Result<(), qedb_primitives::Error> {
 //! // Setup and preprocessing: a table of 4 rows with one column.
 //! let srs = Srs::setup(4, &mut test_rng())?;
-//! let universe = Universe::new(&srs, 4)?;
 //! let column = Slice::new([10u64, 20, 30, 40].map(Fr::from).to_vec()).commit(&srs)?;
 //!
 //! // The prover: the rows selected by the query, and the sum on them.
 //! let rows = Set::new([1, 3]).commit(&srs)?;
 //! let sum = Fr::from(60u64);
 //! let transcript = &mut Transcript::new("example");
-//! let proof = SumCheckProof::prove(&srs, &universe, &column, &rows, sum, transcript)?;
+//! let proof = SumCheckProof::prove(&srs, &column, &rows, sum, transcript)?;
 //!
 //! // The verifier: the verifier key and the handles only.
 //! let vk = srs.verifier_key();
-//! let (universe, column, rows) = (universe.handle(), column.handle(), rows.handle());
+//! let (column, rows) = (column.handle(), rows.handle());
 //! let transcript = &mut Transcript::new("example");
-//! proof.verify(&vk, universe, column, rows, sum, transcript)?;
+//! proof.verify(&vk, column, rows, sum, transcript)?;
 //! # Ok(())
 //! # }
 //! ```

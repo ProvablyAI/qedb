@@ -226,15 +226,8 @@ fn prove_tot(srs: &Srs, db: &Database, table: &Table) -> (u64, TotProof) {
 
     let intersection =
         IntersectionProof::prove(srs, &[account, day], &selection, transcript).unwrap();
-    let sum_proof = SumCheckProof::prove(
-        srs,
-        &db.universe,
-        &db.price,
-        &selection,
-        Fr::from(sum),
-        transcript,
-    )
-    .unwrap();
+    let sum_proof =
+        SumCheckProof::prove(srs, &db.price, &selection, Fr::from(sum), transcript).unwrap();
     let proof = TotProof {
         selection: selection.handle(),
         intersection,
@@ -249,14 +242,9 @@ fn verify_tot(vk: &VerifierKey, digest: &Digest, sum: u64, proof: &TotProof) -> 
     proof
         .intersection
         .verify(&sets, proof.selection, transcript)?;
-    proof.sum.verify(
-        vk,
-        digest.universe,
-        digest.price,
-        proof.selection,
-        Fr::from(sum),
-        transcript,
-    )
+    proof
+        .sum
+        .verify(vk, digest.price, proof.selection, Fr::from(sum), transcript)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -334,7 +322,7 @@ fn prove_cnt(srs: &Srs, db: &Database, table: &Table) -> (u64, CntProof) {
     )
     .unwrap();
     let count_proof =
-        SumCheckProof::prove(srs, u, ones, &selection, Fr::from(count), transcript).unwrap();
+        SumCheckProof::prove(srs, ones, &selection, Fr::from(count), transcript).unwrap();
     let proof = CntProof {
         selection: selection.handle(),
         below: below.handle(),
@@ -376,7 +364,7 @@ fn verify_cnt(
     proof.upper.verify(vk, &upper, ELL, transcript)?;
     proof
         .count
-        .verify(vk, u, ones, proof.selection, Fr::from(count), transcript)
+        .verify(vk, ones, proof.selection, Fr::from(count), transcript)
 }
 
 // ---------------------------------------------------------------------------------------------
