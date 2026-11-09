@@ -14,6 +14,8 @@ pub enum Error {
         /// Powers in the SRS.
         max: usize,
     },
+    /// The powers of an SRS do not start from the generators `[1]₁` and `[1]₂`.
+    Generators,
     /// A row is outside the evaluation domain.
     RowOutOfDomain {
         /// The row.
@@ -37,6 +39,7 @@ impl fmt::Display for Error {
                     "polynomial has {len} coefficients, the SRS supports {max}"
                 )
             }
+            Self::Generators => write!(f, "the powers do not start from the generators"),
             Self::RowOutOfDomain { row, size } => {
                 write!(f, "row {row} is outside the domain of {size} rows")
             }

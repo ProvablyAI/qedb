@@ -2,7 +2,7 @@
 
 use crate::Error;
 use ark_bls12_381::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{PrimeGroup, ScalarMul, VariableBaseMSM};
+use ark_ec::{AffineRepr, PrimeGroup, ScalarMul, VariableBaseMSM};
 use ark_ff::{Field, UniformRand};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -40,13 +40,17 @@ impl Srs {
     }
 
     /// The SRS of the powers `[τⁱ]₁` and `[τⁱ]₂`, `i = 0, …, N`, for example from a ceremony or
-    /// from storage. `N` must be a power of two, at least 2. The powers are not checked: they
-    /// must come from a trusted source. A prefix of an SRS is the SRS of a smaller domain.
+    /// from storage. `N` must be a power of two, at least 2, and the powers must start from the
+    /// generators the verifier uses. The other powers are not checked: they must come from a
+    /// trusted source. A prefix of an SRS is the SRS of a smaller domain.
     pub fn from_powers(g1: Vec<G1Affine>, g2: Vec<G2Affine>) -> Result<Self, Error> {
         let n = g1.len().saturating_sub(1);
         let domain = Domain::new(n)
             .filter(|domain| domain.size() == n && n >= 2 && g2.len() == g1.len())
             .ok_or(Error::Domain(n))?;
+        if g1[0] != G1Affine::generator() || g2[0] != G2Affine::generator() {
+            return Err(Error::Generators);
+        }
 
         Ok(Self { g1, g2, domain })
     }
@@ -171,6 +175,21 @@ mod tests {
         let (g1, _) = powers(5);
         let (_, g2) = powers(3);
         assert_eq!(Srs::from_powers(g1, g2).unwrap_err(), Error::Domain(4));
+    }
+
+    #[test]
+    fn rejects_powers_without_the_generators() {
+        let srs = Srs::setup(4, &mut test_rng()).unwrap();
+        let (g1, g2) = (srs.g1().to_vec(), srs.g2().to_vec());
+
+        let shifted = |powers: &[G1Affine]| [&powers[1..], &powers[..1]].concat();
+        assert_eq!(
+            Srs::from_powers(shifted(&g1), g2.clone()).unwrap_err(),
+            Error::Generators
+        );
+        let mut other = g2;
+        other.swap(0, 1);
+        assert_eq!(Srs::from_powers(g1, other).unwrap_err(), Error::Generators);
     }
 
     #[test]
