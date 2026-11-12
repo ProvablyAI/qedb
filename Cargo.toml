@@ -1,12 +1,27 @@
 [package]
-name = "qedb"
-version = "0.1.0"
+name = "qedb-primitives"
+version = "0.2.0"
 edition = "2024"
 authors = ["Provably Technologies"]
-description = "Expressive and Modular Verifiable Databases (without SNARKs)"
+description = "Primitives of qedb, a verifiable database scheme over KZG commitments (ePrint 2025/1408)"
 homepage = "https://provably.ai/"
-repository = "https://github.com/ProvablyAI/qedb"
-license = "Business Source License 1.1"
+repository = "https://github.com/ProvablyAI/qedb-primitives"
+license = "BUSL-1.1"
+keywords = ["verifiable-database", "kzg", "cryptography", "pairing", "bls12-381"]
+categories = ["cryptography"]
+include = ["src/**/*", "benches/**/*", "README.md", "CHANGELOG.md", "LICENSE.md"]
 rust-version = "1.97"
 
 [dependencies]
+ark-bls12-381 = "0.6"
+ark-ec = { version = "0.6", features = ["parallel"] }
+ark-ff = { version = "0.6", features = ["parallel", "asm"] }
+ark-poly = { version = "0.6", features = ["parallel"] }
+ark-serialize = { version = "0.6", features = ["derive", "parallel"] }
+ark-std = { version = "0.6", features = ["parallel"] }
+rayon = "1"
+sha2 = "0.11"
+
+[[bench]]
+name = "transactions"
+harness = false
