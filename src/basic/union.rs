@@ -118,6 +118,17 @@ mod tests {
     }
 
     #[test]
+    fn accepts_a_union_of_many_sets() {
+        // One set per row: all at once, they would overflow the stack of a rayon thread.
+        let srs = Srs::setup(64, &mut test_rng()).unwrap();
+        let sets: Vec<CommittedSet> = (0..64).map(|row| set(&srs, &[row])).collect();
+        let sets: Vec<&CommittedSet> = sets.iter().collect();
+        let union = set(&srs, &(0..64).collect::<Vec<_>>());
+        let proof = prove(&srs, &sets, &union).unwrap();
+        assert_eq!(verify(&proof, &sets, &union), Ok(()));
+    }
+
+    #[test]
     fn rejects_a_union_with_an_extra_row() {
         let srs = Srs::setup(16, &mut test_rng()).unwrap();
         let (a, b) = (set(&srs, &[0, 2]), set(&srs, &[2, 3]));

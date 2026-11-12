@@ -34,21 +34,12 @@ impl CoprimeProof {
     /// Proves that `sets` have no common row; `test` names the calling test in errors.
     pub fn prove(srs: &Srs, sets: &[Set], test: &'static str) -> Result<Self, Error> {
         let domain = srs.domain();
-        let polynomials = sets
-            .par_iter()
-            .map(|set| set.characteristic(domain))
-            .collect::<Result<Vec<_>, _>>()?;
+        let polynomials = in_batches(sets, |set| set.characteristic(domain))?;
         let bezout = bezout_coefficients(domain, sets, &polynomials, test)?;
 
         Ok(Self {
-            sets_g2: polynomials
-                .par_iter()
-                .map(|p| srs.commit_g2(p))
-                .collect::<Result<_, _>>()?,
-            bezout_g1: bezout
-                .par_iter()
-                .map(|q| srs.commit_g1(q))
-                .collect::<Result<_, _>>()?,
+            sets_g2: in_batches(&polynomials, |p| srs.commit_g2(p))?,
+            bezout_g1: in_batches(&bezout, |q| srs.commit_g1(q))?,
         })
     }
 
@@ -115,16 +106,30 @@ fn bezout_coefficients(
 
     let q = Set::new((0..n).filter(|&row| !in_union[row])).characteristic(domain)?;
     let q_evals = domain.fft(&q.coeffs);
-    assigned
-        .par_iter()
-        .zip(polynomials)
-        .map(|(rows, p)| {
-            let mut f = vec![Fr::zero(); n];
-            for &row in rows {
-                f[row] = q_evals[row];
-            }
-            let f = DensePolynomial::from_coefficients_vec(domain.ifft(&f));
-            divide_exact(&f, &(&q * p))
-        })
-        .collect()
+    let sets: Vec<_> = assigned.iter().zip(polynomials).collect();
+    in_batches(&sets, |&(rows, p)| {
+        let mut f = vec![Fr::zero(); n];
+        for &row in rows {
+            f[row] = q_evals[row];
+        }
+        let f = DensePolynomial::from_coefficients_vec(domain.ifft(&f));
+        divide_exact(&f, &(&q * p))
+    })
+}
+
+/// The most sets the prover works on at once. The work on each set is parallel inside, and a rayon
+/// thread waiting for it runs the work on other sets on top of its own stack: with all the sets at
+/// once, a few hundred of them overflow the 2 MiB stack of a rayon thread.
+const BATCH: usize = 8;
+
+/// `f` on every item, in parallel batches of [`BATCH`] items.
+fn in_batches<T: Sync, U: Send>(
+    items: &[T],
+    f: impl Fn(&T) -> Result<U, Error> + Sync,
+) -> Result<Vec<U>, Error> {
+    let mut results = Vec::with_capacity(items.len());
+    for batch in items.chunks(BATCH) {
+        results.extend(batch.par_iter().map(&f).collect::<Result<Vec<_>, _>>()?);
+    }
+    Ok(results)
 }
