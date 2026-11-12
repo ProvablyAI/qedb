@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-12
+
 ### Added
 
 - `Srs::lagrange`, the Lagrange basis `[λᵢ(τ)]₁`: computed from `τ` by `Srs::setup`, and from the
@@ -17,6 +19,13 @@ All notable changes to this project are documented in this file. The format is b
 
 - Slices and the range check's bits are committed in the Lagrange basis. Handles and proofs are
   unchanged; at 2^17 rows, `QCntTx` proves 41% faster and `QMatch` 32% faster.
+- The Bézout coefficients of the intersection and union tests are computed on the rows of the sets
+  when every set leaves few rows of the union, instead of with FFTs on the whole domain.
+
+### Fixed
+
+- The intersection and union tests work on at most 8 sets at once: with a few hundred sets, the
+  prover overflowed the stack of rayon's threads.
 
 ## [0.1.0] - 2026-11-05
 
